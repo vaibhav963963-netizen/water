@@ -1,0 +1,41 @@
+{
+  "expo": {
+    "name": "Live WaterPaper",
+    "slug": "water-live-wallpaper",
+    "version": "1.0.0",
+    "orientation": "portrait",
+    "icon": "./assets/icon.png",
+    "userInterfaceStyle": "light",
+    "splash": {
+      "image": "./assets/splash.png",
+      "resizeMode": "contain",
+      "backgroundColor": "#F4F7F9"
+    },
+    "assetBundlePatterns": [
+      "**/*"
+    ],
+    "ios": {
+      "supportsTablet": true
+    },
+    "android": {
+      "package": "com.waterlivewallpaper",
+      "adaptiveIcon": {
+        "foregroundImage": "./assets/adaptive-icon.png",
+        "backgroundColor": "#E0F7FA"
+      },
+      "permissions": [
+        "SET_WALLPAPER",
+        "SET_WALLPAPER_HINTS",
+        "WAKE_LOCK",
+        "READ_EXTERNAL_STORAGE"
+      ]
+    },
+    "web": {
+      "favicon": "./assets/favicon.png"
+    },
+    "plugins": [
+      "expo-router"
+    ],
+    "scheme": "waterwallpaper"
+  }
+}

@@ -1,0 +1,6 @@
+<resources>
+    <string name="app_name">Live WaterPaper</string>
+    <string name="wallpaper_name">Live WaterPaper</string>
+    <string name="wallpaper_description">Real-time fluid simulation wallpaper reacting to phone tilt, inertia, and splashes.</string>
+    <string name="wallpaper_author">Antigravity Engineering</string>
+</resources>

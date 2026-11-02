@@ -1,0 +1,2 @@
+rootProject.name = 'water-live-wallpaper'
+include ':app'

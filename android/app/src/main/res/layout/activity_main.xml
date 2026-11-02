@@ -1,0 +1,330 @@
+<?xml version="1.0" encoding="utf-8"?>
+<FrameLayout xmlns:android="http://schemas.android.com/apk/res/android"
+    android:layout_width="match_parent"
+    android:layout_height="match_parent"
+    android:background="#F4F7F9">
+
+    <!-- Fullscreen Real-Time OpenGL ES Liquid Surface -->
+    <com.waterlivewallpaper.view.WaterSurfaceView
+        android:id="@+id/waterSurfaceView"
+        android:layout_width="match_parent"
+        android:layout_height="match_parent" />
+
+    <!-- Top Floating Header Pill -->
+    <LinearLayout
+        android:layout_width="wrap_content"
+        android:layout_height="wrap_content"
+        android:layout_gravity="top|center_horizontal"
+        android:layout_marginTop="48dp"
+        android:orientation="horizontal"
+        android:gravity="center_vertical"
+        android:background="@drawable/card_bg_translucent"
+        android:paddingStart="16dp"
+        android:paddingEnd="16dp"
+        android:paddingTop="8dp"
+        android:paddingBottom="8dp"
+        android:elevation="6dp">
+
+        <View
+            android:layout_width="10dp"
+            android:layout_height="10dp"
+            android:background="@drawable/circle_cyan"
+            android:layout_marginEnd="8dp" />
+
+        <TextView
+            android:layout_width="wrap_content"
+            android:layout_height="wrap_content"
+            android:text="Live WaterPaper"
+            android:textSize="15sp"
+            android:textStyle="bold"
+            android:textColor="#0F172A" />
+
+        <TextView
+            android:layout_width="wrap_content"
+            android:layout_height="wrap_content"
+            android:text=" • 60 FPS"
+            android:textSize="12sp"
+            android:textColor="#0284C7" />
+    </LinearLayout>
+
+    <!-- Bottom Controls Area -->
+    <LinearLayout
+        android:layout_width="match_parent"
+        android:layout_height="wrap_content"
+        android:layout_gravity="bottom"
+        android:orientation="vertical"
+        android:paddingStart="16dp"
+        android:paddingEnd="16dp"
+        android:paddingBottom="24dp">
+
+        <!-- Collapsible Settings Panel -->
+        <LinearLayout
+            android:id="@+id/panelSettings"
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:orientation="vertical"
+            android:background="@drawable/card_bg_translucent"
+            android:padding="18dp"
+            android:layout_marginBottom="12dp"
+            android:elevation="8dp"
+            android:visibility="gone">
+
+            <!-- Water Volume Slider -->
+            <LinearLayout
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:orientation="horizontal"
+                android:gravity="center_vertical">
+                <TextView
+                    android:layout_width="0dp"
+                    android:layout_height="wrap_content"
+                    android:layout_weight="1"
+                    android:text="Water Volume"
+                    android:textSize="13sp"
+                    android:textStyle="bold"
+                    android:textColor="#1E293B" />
+                <TextView
+                    android:id="@+id/textVolumeVal"
+                    android:layout_width="wrap_content"
+                    android:layout_height="wrap_content"
+                    android:text="38%"
+                    android:textSize="12sp"
+                    android:textColor="#0284C7" />
+            </LinearLayout>
+
+            <SeekBar
+                android:id="@+id/seekVolume"
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:max="70"
+                android:progress="38"
+                android:progressTint="#00B4D8"
+                android:thumbTint="#00B4D8"
+                android:layout_marginTop="2dp"
+                android:layout_marginBottom="10dp" />
+
+            <!-- Water Speed / Gravity Slider -->
+            <LinearLayout
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:orientation="horizontal"
+                android:gravity="center_vertical">
+                <TextView
+                    android:layout_width="0dp"
+                    android:layout_height="wrap_content"
+                    android:layout_weight="1"
+                    android:text="Water Speed (Gravity)"
+                    android:textSize="13sp"
+                    android:textStyle="bold"
+                    android:textColor="#1E293B" />
+                <TextView
+                    android:id="@+id/textSpeedVal"
+                    android:layout_width="wrap_content"
+                    android:layout_height="wrap_content"
+                    android:text="2.0x (Instant)"
+                    android:textSize="12sp"
+                    android:textColor="#0284C7" />
+            </LinearLayout>
+
+            <SeekBar
+                android:id="@+id/seekSpeed"
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:max="350"
+                android:progress="200"
+                android:progressTint="#00B4D8"
+                android:thumbTint="#00B4D8"
+                android:layout_marginTop="2dp"
+                android:layout_marginBottom="10dp" />
+
+            <!-- Flow Sensitivity Slider -->
+            <LinearLayout
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:orientation="horizontal"
+                android:gravity="center_vertical">
+                <TextView
+                    android:layout_width="0dp"
+                    android:layout_height="wrap_content"
+                    android:layout_weight="1"
+                    android:text="Tilt Response"
+                    android:textSize="13sp"
+                    android:textStyle="bold"
+                    android:textColor="#1E293B" />
+                <TextView
+                    android:id="@+id/textSensitivityVal"
+                    android:layout_width="wrap_content"
+                    android:layout_height="wrap_content"
+                    android:text="1.25x"
+                    android:textSize="12sp"
+                    android:textColor="#0284C7" />
+            </LinearLayout>
+
+            <SeekBar
+                android:id="@+id/seekSensitivity"
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:max="200"
+                android:progress="125"
+                android:progressTint="#00B4D8"
+                android:thumbTint="#00B4D8"
+                android:layout_marginTop="2dp"
+                android:layout_marginBottom="10dp" />
+
+            <!-- Shake Surge Slider -->
+            <LinearLayout
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:orientation="horizontal"
+                android:gravity="center_vertical">
+                <TextView
+                    android:layout_width="0dp"
+                    android:layout_height="wrap_content"
+                    android:layout_weight="1"
+                    android:text="Shake Surge"
+                    android:textSize="13sp"
+                    android:textStyle="bold"
+                    android:textColor="#1E293B" />
+                <TextView
+                    android:id="@+id/textShakeVal"
+                    android:layout_width="wrap_content"
+                    android:layout_height="wrap_content"
+                    android:text="1.1x"
+                    android:textSize="12sp"
+                    android:textColor="#0284C7" />
+            </LinearLayout>
+
+            <SeekBar
+                android:id="@+id/seekShake"
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:max="160"
+                android:progress="110"
+                android:progressTint="#00B4D8"
+                android:thumbTint="#00B4D8"
+                android:layout_marginTop="2dp"
+                android:layout_marginBottom="12dp" />
+
+            <!-- Settings Actions -->
+            <LinearLayout
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:orientation="horizontal"
+                android:gravity="center">
+
+                <Button
+                    android:id="@+id/btnSimulateShake"
+                    android:layout_width="0dp"
+                    android:layout_height="40dp"
+                    android:layout_weight="1"
+                    android:text="⚡ Test Splash"
+                    android:textSize="12sp"
+                    android:textColor="#0369A1"
+                    android:background="@drawable/btn_secondary_bg"
+                    android:layout_marginEnd="8dp" />
+
+                <Button
+                    android:id="@+id/btnResetDefaults"
+                    android:layout_width="0dp"
+                    android:layout_height="40dp"
+                    android:layout_weight="1"
+                    android:text="↺ Reset"
+                    android:textSize="12sp"
+                    android:textColor="#64748B"
+                    android:background="@drawable/btn_secondary_bg" />
+            </LinearLayout>
+        </LinearLayout>
+
+        <!-- Floating Glass Bottom Bar -->
+        <LinearLayout
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:orientation="vertical"
+            android:background="@drawable/card_bg_translucent"
+            android:padding="14dp"
+            android:elevation="10dp">
+
+            <!-- Color Palette Row -->
+            <LinearLayout
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:orientation="horizontal"
+                android:gravity="center"
+                android:layout_marginBottom="12dp">
+
+                <!-- Cyan (Default Authentic) -->
+                <View
+                    android:id="@+id/colorCyan"
+                    android:layout_width="34dp"
+                    android:layout_height="34dp"
+                    android:background="@drawable/circle_cyan"
+                    android:layout_marginHorizontal="8dp" />
+
+                <!-- Azure -->
+                <View
+                    android:id="@+id/colorAzure"
+                    android:layout_width="34dp"
+                    android:layout_height="34dp"
+                    android:background="@drawable/circle_azure"
+                    android:layout_marginHorizontal="8dp" />
+
+                <!-- Violet -->
+                <View
+                    android:id="@+id/colorViolet"
+                    android:layout_width="34dp"
+                    android:layout_height="34dp"
+                    android:background="@drawable/circle_violet"
+                    android:layout_marginHorizontal="8dp" />
+
+                <!-- Sunset -->
+                <View
+                    android:id="@+id/colorSunset"
+                    android:layout_width="34dp"
+                    android:layout_height="34dp"
+                    android:background="@drawable/circle_sunset"
+                    android:layout_marginHorizontal="8dp" />
+
+                <!-- Emerald -->
+                <View
+                    android:id="@+id/colorEmerald"
+                    android:layout_width="34dp"
+                    android:layout_height="34dp"
+                    android:background="@drawable/circle_emerald"
+                    android:layout_marginHorizontal="8dp" />
+            </LinearLayout>
+
+            <!-- Action Buttons Row -->
+            <LinearLayout
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:orientation="horizontal"
+                android:gravity="center_vertical">
+
+                <!-- Toggle Settings Button -->
+                <Button
+                    android:id="@+id/btnToggleSettings"
+                    android:layout_width="48dp"
+                    android:layout_height="48dp"
+                    android:text="⚙"
+                    android:textSize="20sp"
+                    android:textColor="#0369A1"
+                    android:background="@drawable/btn_icon_bg"
+                    android:layout_marginEnd="10dp" />
+
+                <!-- Primary "Set as Wallpaper" Button -->
+                <Button
+                    android:id="@+id/btnSetWallpaper"
+                    android:layout_width="0dp"
+                    android:layout_height="48dp"
+                    android:layout_weight="1"
+                    android:text="SET AS LIVE WALLPAPER"
+                    android:textSize="13sp"
+                    android:textStyle="bold"
+                    android:textColor="#FFFFFF"
+                    android:background="@drawable/btn_primary_bg"
+                    android:elevation="4dp" />
+            </LinearLayout>
+        </LinearLayout>
+    </LinearLayout>
+
+</FrameLayout>

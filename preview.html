@@ -1,0 +1,656 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Live WaterPaper - Real-Time Fluid Simulation</title>
+  <style>
+    * {
+      box-sizing: border-box;
+      margin: 0;
+      padding: 0;
+      font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif;
+      user-select: none;
+    }
+
+    body {
+      background: #E8EEF5;
+      display: flex;
+      justify-content: center;
+      align-items: center;
+      min-height: 100vh;
+      padding: 24px;
+    }
+
+    .wrapper {
+      display: flex;
+      flex-direction: row;
+      gap: 28px;
+      background: #FFFFFF;
+      padding: 28px;
+      border-radius: 32px;
+      box-shadow: 0 24px 48px rgba(15, 23, 42, 0.1);
+      max-width: 980px;
+      width: 100%;
+    }
+
+    /* Phone Mockup Frame */
+    .phone-container {
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+    }
+
+    .phone-frame {
+      width: 360px;
+      height: 640px;
+      background: #F4F5F7;
+      border-radius: 38px;
+      border: 12px solid #0F172A;
+      position: relative;
+      overflow: hidden;
+      box-shadow: 0 20px 40px rgba(0, 0, 0, 0.18);
+      cursor: crosshair;
+    }
+
+    /* Dual canvas layers: Glow layer behind, metaball isosurface on top */
+    .canvas-layer {
+      position: absolute;
+      top: 0;
+      left: 0;
+      width: 100%;
+      height: 100%;
+      display: block;
+    }
+
+    #glowCanvas {
+      filter: blur(12px);
+      opacity: 0.65;
+      pointer-events: none;
+    }
+
+    #simCanvas {
+      filter: url(#metaballFilter);
+    }
+
+    .phone-notch {
+      position: absolute;
+      top: 0;
+      left: 50%;
+      transform: translateX(-50%);
+      width: 120px;
+      height: 18px;
+      background: #0F172A;
+      border-bottom-left-radius: 12px;
+      border-bottom-right-radius: 12px;
+      z-index: 20;
+    }
+
+    .hud {
+      position: absolute;
+      top: 26px;
+      left: 16px;
+      background: rgba(255, 255, 255, 0.88);
+      backdrop-filter: blur(8px);
+      padding: 6px 14px;
+      border-radius: 14px;
+      font-size: 12px;
+      font-weight: 700;
+      color: #0F172A;
+      pointer-events: none;
+      z-index: 20;
+      border: 1px solid rgba(0,0,0,0.06);
+    }
+
+    .hint {
+      margin-top: 14px;
+      font-size: 13px;
+      color: #64748B;
+      text-align: center;
+    }
+
+    /* Controls Panel */
+    .controls {
+      flex: 1;
+      display: flex;
+      flex-direction: column;
+      gap: 16px;
+    }
+
+    .controls h1 {
+      font-size: 26px;
+      font-weight: 800;
+      color: #0F172A;
+      letter-spacing: -0.5px;
+    }
+
+    .controls p.sub {
+      font-size: 14px;
+      color: #64748B;
+      margin-top: -6px;
+      margin-bottom: 4px;
+    }
+
+    .panel-card {
+      background: #F8FAFC;
+      border: 1px solid #E2E8F0;
+      border-radius: 18px;
+      padding: 16px;
+    }
+
+    .panel-title {
+      font-size: 14px;
+      font-weight: 700;
+      color: #0F172A;
+      margin-bottom: 10px;
+    }
+
+    .tilt-pad {
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      gap: 8px;
+    }
+
+    .tilt-row {
+      display: flex;
+      gap: 8px;
+    }
+
+    button.tilt-btn {
+      background: #FFFFFF;
+      border: 1px solid #CBD5E1;
+      padding: 10px 16px;
+      border-radius: 12px;
+      font-size: 13px;
+      font-weight: 600;
+      cursor: pointer;
+      color: #0F172A;
+      transition: all 0.15s ease;
+      box-shadow: 0 1px 3px rgba(0,0,0,0.05);
+    }
+
+    button.tilt-btn:hover {
+      background: #00E5FF;
+      border-color: #00B4D8;
+      color: #0F172A;
+    }
+
+    button.tilt-btn:active {
+      transform: scale(0.96);
+    }
+
+    .slider-group {
+      display: flex;
+      flex-direction: column;
+      gap: 12px;
+    }
+
+    .slider-item {
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      font-size: 13px;
+      font-weight: 600;
+      color: #334155;
+    }
+
+    .slider-item input[type="range"] {
+      width: 150px;
+      accent-color: #00B4D8;
+      cursor: pointer;
+    }
+
+    .color-presets {
+      display: flex;
+      gap: 12px;
+    }
+
+    .color-swatch {
+      width: 36px;
+      height: 36px;
+      border-radius: 18px;
+      cursor: pointer;
+      border: 3px solid #FFFFFF;
+      box-shadow: 0 2px 8px rgba(0,0,0,0.18);
+      transition: transform 0.15s ease;
+    }
+
+    .color-swatch:hover {
+      transform: scale(1.15);
+    }
+
+    .color-swatch.active {
+      outline: 2px solid #00B4D8;
+      transform: scale(1.1);
+    }
+
+    .btn-shake {
+      background: #00E5FF;
+      color: #0F172A;
+      border: none;
+      padding: 16px;
+      border-radius: 16px;
+      font-size: 15px;
+      font-weight: 800;
+      cursor: pointer;
+      box-shadow: 0 6px 16px rgba(0, 229, 255, 0.4);
+      transition: all 0.15s ease;
+      margin-top: auto;
+      letter-spacing: 0.3px;
+    }
+
+    .btn-shake:hover {
+      background: #00B4D8;
+      color: #FFFFFF;
+      box-shadow: 0 6px 20px rgba(0, 180, 216, 0.5);
+    }
+
+    .btn-shake:active {
+      transform: scale(0.98);
+    }
+
+    @media (max-width: 820px) {
+      .wrapper {
+        flex-direction: column;
+        align-items: center;
+      }
+    }
+  </style>
+</head>
+<body>
+
+  <!-- SVG Metaball Isosurface Filter -->
+  <svg style="position: absolute; width: 0; height: 0; overflow: hidden;" aria-hidden="true">
+    <defs>
+      <filter id="metaballFilter" color-interpolation-filters="sRGB">
+        <!-- 1. Blur overlapping particles -->
+        <feGaussianBlur in="SourceGraphic" stdDeviation="11" result="blur" />
+        <!-- 2. Alpha thresholding: Converts blurred gradient into sharp, organic liquid boundary -->
+        <feColorMatrix in="blur" mode="matrix" values="
+          1 0 0 0 0
+          0 1 0 0 0
+          0 0 1 0 0
+          0 0 0 26 -9.2" result="metaball" />
+        <feComposite in="SourceGraphic" in2="metaball" operator="atop" />
+      </filter>
+    </defs>
+  </svg>
+
+  <div class="wrapper">
+    <!-- Phone Simulation Screen -->
+    <div class="phone-container">
+      <div class="phone-frame" id="phoneFrame">
+        <div class="phone-notch"></div>
+        <div class="hud" id="hud">60 FPS • SPH Liquid Solver</div>
+        <!-- Background soft glow layer -->
+        <canvas id="glowCanvas" class="canvas-layer" width="360" height="640"></canvas>
+        <!-- Foreground connected metaball liquid layer -->
+        <canvas id="simCanvas" class="canvas-layer" width="360" height="640"></canvas>
+      </div>
+      <div class="hint">🖱️ <b>Drag mouse on water</b> to slosh • Click <b>Tilt</b> buttons to flow</div>
+    </div>
+
+    <!-- Controls & Sensors Emulator -->
+    <div class="controls">
+      <div>
+        <h1>Live WaterPaper</h1>
+        <p class="sub">Authentic Real-Time Liquid Physics & Isosurface Simulation</p>
+      </div>
+
+      <!-- Tilt Controller -->
+      <div class="panel-card">
+        <div class="panel-title">📱 Phone Tilt & Gravity Simulator</div>
+        <div class="tilt-pad">
+          <button class="tilt-btn" onclick="setTilt(0, -980)">⬆ Invert (Hang from Top)</button>
+          <div class="tilt-row">
+            <button class="tilt-btn" onclick="setTilt(-850, 480)">⬅ Tilt Left</button>
+            <button class="tilt-btn" onclick="setTilt(0, 980)">⬇ Normal (Bottom)</button>
+            <button class="tilt-btn" onclick="setTilt(850, 480)">➡ Tilt Right</button>
+          </div>
+        </div>
+      </div>
+
+      <!-- Presets & Color -->
+      <div class="panel-card">
+        <div class="panel-title">🎨 Liquid Color Preset</div>
+        <div class="color-presets">
+          <div class="color-swatch active" style="background: #00E5FF;" title="Original Live WaterPaper Cyan" onclick="setColor('#00E5FF', '#00B4D8', this)"></div>
+          <div class="color-swatch" style="background: #0288D1;" title="Deep Ocean" onclick="setColor('#0288D1', '#01579B', this)"></div>
+          <div class="color-swatch" style="background: #00E676;" title="Neon Emerald" onclick="setColor('#00E676', '#00B0FF', this)"></div>
+          <div class="color-swatch" style="background: #FF5252;" title="Coral Sunset" onclick="setColor('#FF5252', '#FF7043', this)"></div>
+          <div class="color-swatch" style="background: #D500F9;" title="Electric Amethyst" onclick="setColor('#D500F9', '#7C4DFF', this)"></div>
+        </div>
+      </div>
+
+      <!-- Fluid Physics Sliders -->
+      <div class="panel-card">
+        <div class="panel-title">⚙️ Physics Parameters</div>
+        <div class="slider-group">
+          <div class="slider-item">
+            <span>Water Volume:</span>
+            <input type="range" min="0.20" max="0.65" step="0.05" value="0.38" id="sliderVol" oninput="changeVolume(this.value)">
+          </div>
+          <div class="slider-item">
+            <span>Gravity Strength:</span>
+            <input type="range" min="0.5" max="2.2" step="0.1" value="1.25" id="sliderSens" oninput="changeSens(this.value)">
+          </div>
+          <div class="slider-item">
+            <span>Luminous Glow:</span>
+            <input type="range" min="0.0" max="1.0" step="0.05" value="0.65" id="sliderGlow" oninput="changeGlow(this.value)">
+          </div>
+        </div>
+      </div>
+
+      <!-- Shake button -->
+      <button class="btn-shake" onclick="shakePhone()">🌊 Shake Phone (Inertial Splash Surge)</button>
+    </div>
+  </div>
+
+  <script>
+    const simCanvas = document.getElementById('simCanvas');
+    const simCtx = simCanvas.getContext('2d');
+
+    const glowCanvas = document.getElementById('glowCanvas');
+    const glowCtx = glowCanvas.getContext('2d');
+
+    const hud = document.getElementById('hud');
+
+    const width = 360;
+    const height = 640;
+    const particleRadius = 26;
+    const restDensity = 2.8;
+    const stiffness = 4200;
+    const viscosity = 38;
+    const surfaceTension = 42;
+    const boundaryDamping = 0.45;
+    const dropletMergeRadius = 36;
+
+    // Authentic Live WaterPaper Cyan
+    let waterColor = '#00E5FF';
+    let secondaryColor = '#00B4D8';
+    let glowIntensity = 0.65;
+    let sensitivity = 1.0;
+    let flowSpeed = 2.0;
+
+    let gravityX = 0;
+    let gravityY = 2400 * sensitivity;
+
+    let particles = [];
+
+    function initParticles(volumeRatio) {
+      particles = [];
+      const count = Math.floor(100 + volumeRatio * 180);
+      const cols = 12;
+      const spacing = particleRadius * 1.45;
+      const startY = height - Math.ceil(count / cols) * spacing - 24;
+      const startX = (width - cols * spacing) / 2;
+
+      for (let i = 0; i < count; i++) {
+        const col = i % cols;
+        const row = Math.floor(i / cols);
+        particles.push({
+          x: Math.max(particleRadius, Math.min(width - particleRadius, startX + col * spacing + (Math.random() - 0.5) * 4)),
+          y: Math.max(particleRadius, Math.min(height - particleRadius, startY + row * spacing + (Math.random() - 0.5) * 4)),
+          vx: 0,
+          vy: 0,
+          radius: particleRadius,
+          density: restDensity,
+          pressure: 0,
+          isDroplet: false,
+          lifetime: 0
+        });
+      }
+    }
+
+    initParticles(0.38);
+
+    function setTilt(gx, gy) {
+      gravityX = gx * sensitivity;
+      gravityY = gy * sensitivity;
+    }
+
+    function shakePhone() {
+      // Natural inertial surge across the liquid mass
+      const surgeAngle = (Math.random() - 0.5) * 0.8;
+      const surgeMagnitude = 850;
+      const surgeX = Math.sin(surgeAngle) * surgeMagnitude;
+      const surgeY = -Math.cos(surgeAngle) * surgeMagnitude;
+
+      for (const p of particles) {
+        const heightFactor = (p.y / height);
+        p.vx += (surgeX + (Math.random() - 0.5) * 300) * heightFactor;
+        p.vy += (surgeY + (Math.random() - 0.5) * 200) * heightFactor;
+
+        // Energetic surface particles detach into droplets
+        const speed = Math.hypot(p.vx, p.vy);
+        if (speed > 700 && Math.random() < 0.35) {
+          p.isDroplet = true;
+          p.radius = particleRadius * (0.42 + Math.random() * 0.32);
+          p.lifetime = 0;
+        }
+      }
+    }
+
+    function setColor(primary, sec, el) {
+      waterColor = primary;
+      secondaryColor = sec;
+      document.querySelectorAll('.color-swatch').forEach(s => s.classList.remove('active'));
+      el.classList.add('active');
+    }
+
+    function changeVolume(val) {
+      initParticles(parseFloat(val));
+    }
+
+    function changeSens(val) {
+      sensitivity = parseFloat(val);
+      const curSignX = gravityX >= 0 ? 1 : -1;
+      const curSignY = gravityY >= 0 ? 1 : -1;
+      gravityY = curSignY * 980 * sensitivity;
+      if (Math.abs(gravityX) > 10) {
+        gravityX = curSignX * 850 * sensitivity;
+      }
+    }
+
+    function changeGlow(val) {
+      glowIntensity = parseFloat(val);
+      glowCanvas.style.opacity = (glowIntensity * 0.85).toString();
+    }
+
+    // Interactive mouse / touch dragging
+    let isMouseDown = false;
+    function addDisturbance(x, y, force = 550) {
+      for (const p of particles) {
+        const dx = p.x - x;
+        const dy = p.y - y;
+        const d = Math.hypot(dx, dy);
+        const radius = 160;
+        if (d < radius && d > 0.001) {
+          const factor = (1 - d / radius) * force;
+          p.vx += (dx / d) * factor;
+          p.vy += (dy / d) * factor;
+        }
+      }
+    }
+
+    simCanvas.addEventListener('mousedown', (e) => {
+      isMouseDown = true;
+      const rect = simCanvas.getBoundingClientRect();
+      addDisturbance(e.clientX - rect.left, e.clientY - rect.top, 650);
+    });
+
+    window.addEventListener('mouseup', () => { isMouseDown = false; });
+
+    simCanvas.addEventListener('mousemove', (e) => {
+      if (!isMouseDown) return;
+      const rect = simCanvas.getBoundingClientRect();
+      addDisturbance(e.clientX - rect.left, e.clientY - rect.top, 450);
+    });
+
+    // Simulation & Render Loop
+    let lastTime = performance.now();
+    let frameCount = 0;
+    let fps = 60;
+    let lastFpsTime = performance.now();
+
+    function step() {
+      const now = performance.now();
+      const dt = Math.min((now - lastTime) / 1000, 0.033);
+      lastTime = now;
+
+      frameCount++;
+      if (now - lastFpsTime >= 1000) {
+        fps = frameCount;
+        frameCount = 0;
+        lastFpsTime = now;
+        const droplets = particles.filter(p => p.isDroplet).length;
+        hud.innerText = `${fps} FPS • ${particles.length} Particles (${droplets} Droplets)`;
+      }
+
+      const h = particleRadius * 2.2;
+      const h2 = h * h;
+
+      // 1. SPH Density
+      for (let i = 0; i < particles.length; i++) {
+        const pi = particles[i];
+        let density = 0;
+        for (let j = 0; j < particles.length; j++) {
+          const pj = particles[j];
+          const dx = pj.x - pi.x;
+          const dy = pj.y - pi.y;
+          const r2 = dx * dx + dy * dy;
+          if (r2 < h2) {
+            const factor = 1 - r2 / h2;
+            density += factor * factor * factor;
+          }
+        }
+        pi.density = Math.max(density, 0.5);
+        // Repulsive pressure to maintain liquid volume
+        pi.pressure = Math.max(0, stiffness * (pi.density - restDensity));
+      }
+
+      // 2. Forces: Pressure Repulsion + Surface Tension Cohesion + Viscosity
+      for (let i = 0; i < particles.length; i++) {
+        const pi = particles[i];
+        let fPressureX = 0;
+        let fPressureY = 0;
+        let fViscosityX = 0;
+        let fViscosityY = 0;
+
+        for (let j = 0; j < particles.length; j++) {
+          if (i === j) continue;
+          const pj = particles[j];
+          const dx = pj.x - pi.x;
+          const dy = pj.y - pi.y;
+          const r = Math.hypot(dx, dy);
+
+          if (r < h && r > 0.001) {
+            const normX = dx / r;
+            const normY = dy / r;
+            const q = 1 - r / h;
+
+            // Repulsive pressure gradient
+            const avgPressure = (pi.pressure + pj.pressure) / (2 * pj.density);
+            const pScalar = avgPressure * q * q * 16;
+            fPressureX -= normX * pScalar;
+            fPressureY -= normY * pScalar;
+
+            // Cohesive surface tension pulling neighbors into smooth continuous sheets
+            const cohesionScalar = surfaceTension * q * q;
+            fPressureX += normX * cohesionScalar;
+            fPressureY += normY * cohesionScalar;
+
+            // Viscous shear
+            const dvx = pj.vx - pi.vx;
+            const dvy = pj.vy - pi.vy;
+            const vScalar = (viscosity / pj.density) * q;
+            fViscosityX += dvx * vScalar;
+            fViscosityY += dvy * vScalar;
+
+            // Droplets merge back upon touching fluid body
+            if (pi.isDroplet && !pj.isDroplet && r < dropletMergeRadius) {
+              pi.isDroplet = false;
+              pi.radius = particleRadius;
+              pi.vx = (pi.vx + pj.vx) * 0.5;
+              pi.vy = (pi.vy + pj.vy) * 0.5;
+            }
+          }
+        }
+
+        // Droplet detachment under high velocity and low neighbor density
+        if (!pi.isDroplet && pi.density < restDensity * 0.40) {
+          const speed = Math.hypot(pi.vx, pi.vy);
+          if (speed > 750) {
+            pi.isDroplet = true;
+            pi.radius = particleRadius * (0.42 + Math.random() * 0.3);
+            pi.lifetime = 0;
+          }
+        }
+
+        const ax = (fPressureX + fViscosityX) / pi.density + gravityX;
+        const ay = (fPressureY + fViscosityY) / pi.density + gravityY;
+
+        pi.vx = (pi.vx + ax * dt) * 0.996;
+        pi.vy = (pi.vy + ay * dt) * 0.996;
+
+        // Velocity clamping
+        const spd = Math.hypot(pi.vx, pi.vy);
+        if (spd > 2400) {
+          pi.vx = (pi.vx / spd) * 2400;
+          pi.vy = (pi.vy / spd) * 2400;
+        }
+
+        pi.x += pi.vx * dt;
+        pi.y += pi.vy * dt;
+
+        if (pi.isDroplet) {
+          pi.lifetime += dt;
+          if (pi.lifetime > 4.0 && spd < 120) {
+            pi.isDroplet = false;
+            pi.radius = particleRadius;
+          }
+        }
+
+        // Boundary collision with screen walls
+        const r = pi.radius;
+        if (pi.x < r) { pi.x = r; pi.vx = -pi.vx * boundaryDamping; }
+        if (pi.x > width - r) { pi.x = width - r; pi.vx = -pi.vx * boundaryDamping; }
+        if (pi.y < r) { pi.y = r; pi.vy = -pi.vy * boundaryDamping; }
+        if (pi.y > height - r) { pi.y = height - r; pi.vy = -pi.vy * boundaryDamping; }
+      }
+
+      // -----------------------------------------------------------------
+      // Render: Two-layer continuous organic liquid with luminous edge
+      // -----------------------------------------------------------------
+      simCtx.clearRect(0, 0, width, height);
+      glowCtx.clearRect(0, 0, width, height);
+
+      // Layer 1: Luminous soft cyan glow (behind)
+      if (glowIntensity > 0.05) {
+        glowCtx.fillStyle = waterColor;
+        for (let i = 0; i < particles.length; i++) {
+          const p = particles[i];
+          glowCtx.beginPath();
+          glowCtx.arc(p.x, p.y, p.radius * 1.55, 0, Math.PI * 2);
+          glowCtx.fill();
+        }
+      }
+
+      // Layer 2: Solid vibrant cyan liquid (processed via SVG metaball filter)
+      // The filter fuses overlapping circles into a single seamless continuous body!
+      simCtx.fillStyle = waterColor;
+      for (let i = 0; i < particles.length; i++) {
+        const p = particles[i];
+        simCtx.beginPath();
+        simCtx.arc(p.x, p.y, p.radius * 1.25, 0, Math.PI * 2);
+        simCtx.fill();
+      }
+
+      requestAnimationFrame(step);
+    }
+
+    requestAnimationFrame(step);
+  </script>
+</body>
+</html>
