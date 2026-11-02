@@ -24,6 +24,8 @@ class WallpaperPreferences(context: Context) {
         const val KEY_QUALITY_LEVEL = "quality_level"
         const val KEY_TARGET_FPS = "target_fps"
         const val KEY_TOUCH_ENABLED = "touch_enabled"
+        const val KEY_CUSTOM_IMAGE_PATH = "custom_image_path"
+        const val KEY_CUSTOM_IMAGE_ENABLED = "custom_image_enabled"
 
         // Defaults matching original Live WaterPaper screenshots and real-world water physics
         const val DEFAULT_WATER_COLOR = "#00E5FF" // Cyan
@@ -87,6 +89,27 @@ class WallpaperPreferences(context: Context) {
 
     fun isTouchEnabled(): Boolean = prefs.getBoolean(KEY_TOUCH_ENABLED, DEFAULT_TOUCH_ENABLED)
 
+    fun getCustomImagePath(): String? {
+        val enabled = prefs.getBoolean(KEY_CUSTOM_IMAGE_ENABLED, false)
+        if (!enabled) return null
+        val path = prefs.getString(KEY_CUSTOM_IMAGE_PATH, null)
+        return if (path != null && java.io.File(path).exists()) path else null
+    }
+
+    fun setCustomImagePath(path: String?) {
+        val editor = prefs.edit()
+        if (path != null) {
+            editor.putString(KEY_CUSTOM_IMAGE_PATH, path)
+            editor.putBoolean(KEY_CUSTOM_IMAGE_ENABLED, true)
+            editor.putString(KEY_BACKGROUND_TYPE, "custom_image")
+        } else {
+            editor.remove(KEY_CUSTOM_IMAGE_PATH)
+            editor.putBoolean(KEY_CUSTOM_IMAGE_ENABLED, false)
+            editor.putString(KEY_BACKGROUND_TYPE, DEFAULT_BACKGROUND_TYPE)
+        }
+        editor.apply()
+    }
+
     fun saveFromJson(jsonStr: String): Boolean {
         return try {
             val json = JSONObject(jsonStr)
@@ -104,6 +127,26 @@ class WallpaperPreferences(context: Context) {
             if (json.has("qualityLevel")) editor.putString(KEY_QUALITY_LEVEL, json.getString("qualityLevel"))
             if (json.has("targetFps")) editor.putInt(KEY_TARGET_FPS, json.getInt("targetFps"))
             if (json.has("touchInteractionsEnabled")) editor.putBoolean(KEY_TOUCH_ENABLED, json.getBoolean("touchInteractionsEnabled"))
+            if (json.has("customImagePath")) {
+                val path = if (json.isNull("customImagePath")) null else json.getString("customImagePath")
+                if (path != null) {
+                    editor.putString(KEY_CUSTOM_IMAGE_PATH, path)
+                    editor.putBoolean(KEY_CUSTOM_IMAGE_ENABLED, true)
+                } else {
+                    editor.remove(KEY_CUSTOM_IMAGE_PATH)
+                    editor.putBoolean(KEY_CUSTOM_IMAGE_ENABLED, false)
+                }
+            }
+            if (json.has("backgroundImageUri")) {
+                val uri = if (json.isNull("backgroundImageUri")) null else json.getString("backgroundImageUri")
+                if (uri != null) {
+                    editor.putString(KEY_CUSTOM_IMAGE_PATH, uri)
+                    editor.putBoolean(KEY_CUSTOM_IMAGE_ENABLED, true)
+                } else {
+                    editor.remove(KEY_CUSTOM_IMAGE_PATH)
+                    editor.putBoolean(KEY_CUSTOM_IMAGE_ENABLED, false)
+                }
+            }
 
             editor.apply()
             true
@@ -119,6 +162,8 @@ class WallpaperPreferences(context: Context) {
         json.put("waterColorSecondaryHex", prefs.getString(KEY_WATER_SECONDARY_COLOR, DEFAULT_WATER_SECONDARY))
         json.put("backgroundType", getBackgroundType())
         json.put("backgroundColorHex", getBackgroundColorHex())
+        json.put("customImagePath", getCustomImagePath())
+        json.put("backgroundImageUri", getCustomImagePath())
         json.put("waterVolume", getWaterVolume().toDouble())
         json.put("physicsSensitivity", getPhysicsSensitivity().toDouble())
         json.put("flowSpeed", getFlowSpeed().toDouble())
@@ -136,6 +181,8 @@ class WallpaperPreferences(context: Context) {
         editor.putString(KEY_WATER_SECONDARY_COLOR, DEFAULT_WATER_SECONDARY)
         editor.putString(KEY_BACKGROUND_TYPE, DEFAULT_BACKGROUND_TYPE)
         editor.putString(KEY_BACKGROUND_COLOR, DEFAULT_BACKGROUND_COLOR)
+        editor.remove(KEY_CUSTOM_IMAGE_PATH)
+        editor.putBoolean(KEY_CUSTOM_IMAGE_ENABLED, false)
         editor.putFloat(KEY_WATER_VOLUME, DEFAULT_WATER_VOLUME)
         editor.putFloat(KEY_PHYSICS_SENSITIVITY, DEFAULT_PHYSICS_SENSITIVITY)
         editor.putFloat(KEY_FLOW_SPEED, DEFAULT_FLOW_SPEED)

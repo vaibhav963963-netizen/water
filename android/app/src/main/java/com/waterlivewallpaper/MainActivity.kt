@@ -3,248 +3,275 @@ package com.waterlivewallpaper
 import android.app.WallpaperManager
 import android.content.ComponentName
 import android.content.Intent
+import android.content.res.ColorStateList
 import android.os.Bundle
+import android.view.LayoutInflater
 import android.view.View
 import android.widget.Button
+import android.widget.ImageView
 import android.widget.LinearLayout
-import android.widget.SeekBar
+import android.widget.ProgressBar
 import android.widget.TextView
 import android.widget.Toast
+import androidx.appcompat.app.AlertDialog
 import androidx.appcompat.app.AppCompatActivity
-import com.waterlivewallpaper.config.WallpaperPreferences
-import com.waterlivewallpaper.view.WaterSurfaceView
+import androidx.core.content.ContextCompat
+import androidx.fragment.app.Fragment
+import androidx.fragment.app.FragmentManager
+import com.waterlivewallpaper.ui.AnimationUtils
+import com.waterlivewallpaper.ui.fragments.ComingSoonFragment
+import com.waterlivewallpaper.ui.fragments.HomeDashboardFragment
+import com.waterlivewallpaper.ui.fragments.SettingsFragment
+import com.waterlivewallpaper.ui.fragments.WallpaperCustomizeFragment
+import com.waterlivewallpaper.ui.fragments.WallpaperListFragment
+import com.waterlivewallpaper.ui.fragments.WallpaperPreviewFragment
+import com.waterlivewallpaper.updater.UpdateInfo
+import com.waterlivewallpaper.updater.UpdateInstaller
+import com.waterlivewallpaper.updater.UpdateManager
+import com.waterlivewallpaper.updater.UpdateState
 
 class MainActivity : AppCompatActivity() {
 
-    private lateinit var waterSurfaceView: WaterSurfaceView
-    private lateinit var preferences: WallpaperPreferences
+    private lateinit var updateManager: UpdateManager
 
-    private lateinit var panelSettings: LinearLayout
-    private lateinit var btnToggleSettings: Button
-    private lateinit var btnSetWallpaper: Button
-    private lateinit var btnSimulateShake: Button
-    private lateinit var btnResetDefaults: Button
+    private lateinit var bottomNavBar: LinearLayout
+    private lateinit var navTabHome: LinearLayout
+    private lateinit var navIconHome: ImageView
+    private lateinit var navTextHome: TextView
 
-    private lateinit var seekVolume: SeekBar
-    private lateinit var textVolumeVal: TextView
+    private lateinit var navTabWallpaper: LinearLayout
+    private lateinit var navIconWallpaper: ImageView
+    private lateinit var navTextWallpaper: TextView
 
-    private lateinit var seekSpeed: SeekBar
-    private lateinit var textSpeedVal: TextView
+    private lateinit var navTabSettings: LinearLayout
+    private lateinit var navIconSettings: ImageView
+    private lateinit var navTextSettings: TextView
 
-    private lateinit var seekSensitivity: SeekBar
-    private lateinit var textSensitivityVal: TextView
+    private var toastContainer: LinearLayout? = null
+    private var toastTitle: TextView? = null
+    private var toastSubtitle: TextView? = null
+    private var toastIcon: ImageView? = null
+    private var toastDismissRunnable: Runnable? = null
+    private val toastHandler = android.os.Handler(android.os.Looper.getMainLooper())
 
-    private lateinit var seekShake: SeekBar
-    private lateinit var textShakeVal: TextView
+    fun showCustomToast(
+        title: String,
+        subtitle: String? = null,
+        iconRes: Int = R.drawable.sticker_water_drop_3d
+    ) {
+        runOnUiThread {
+            if (toastContainer == null) {
+                toastContainer = findViewById(R.id.toastBannerContainer)
+                toastTitle = findViewById(R.id.toastTitle)
+                toastSubtitle = findViewById(R.id.toastSubtitle)
+                toastIcon = findViewById(R.id.toastIcon)
+                toastContainer?.setOnClickListener {
+                    hideCustomToast()
+                }
+            }
+
+            toastDismissRunnable?.let { toastHandler.removeCallbacks(it) }
+
+            toastTitle?.text = title
+            if (subtitle.isNullOrEmpty()) {
+                toastSubtitle?.visibility = View.GONE
+            } else {
+                toastSubtitle?.text = subtitle
+                toastSubtitle?.visibility = View.VISIBLE
+            }
+            toastIcon?.setImageResource(iconRes)
+
+            toastContainer?.let { container ->
+                container.visibility = View.VISIBLE
+                container.alpha = 0f
+                container.translationY = -60f
+                container.animate()
+                    .alpha(1f)
+                    .translationY(0f)
+                    .setDuration(220)
+                    .setInterpolator(android.view.animation.DecelerateInterpolator())
+                    .start()
+
+                val runnable = Runnable { hideCustomToast() }
+                toastDismissRunnable = runnable
+                toastHandler.postDelayed(runnable, 2600)
+            }
+        }
+    }
+
+    fun hideCustomToast() {
+        toastContainer?.let { container ->
+            container.animate()
+                .alpha(0f)
+                .translationY(-60f)
+                .setDuration(180)
+                .withEndAction {
+                    container.visibility = View.GONE
+                }
+                .start()
+        }
+    }
 
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
         setContentView(R.layout.activity_main)
 
-        preferences = WallpaperPreferences(this)
-        waterSurfaceView = findViewById(R.id.waterSurfaceView)
+        updateManager = UpdateManager(this)
 
-        panelSettings = findViewById(R.id.panelSettings)
-        btnToggleSettings = findViewById(R.id.btnToggleSettings)
-        btnSetWallpaper = findViewById(R.id.btnSetWallpaper)
-        btnSimulateShake = findViewById(R.id.btnSimulateShake)
-        btnResetDefaults = findViewById(R.id.btnResetDefaults)
+        initBottomNavViews()
+        setupBackStackListener()
 
-        seekVolume = findViewById(R.id.seekVolume)
-        textVolumeVal = findViewById(R.id.textVolumeVal)
+        // ALWAYS cold launch into the Home Dashboard Fragment
+        if (savedInstanceState == null) {
+            supportFragmentManager.beginTransaction()
+                .replace(R.id.fragmentContainer, HomeDashboardFragment())
+                .commit()
+        }
 
-        seekSpeed = findViewById(R.id.seekSpeed)
-        textSpeedVal = findViewById(R.id.textSpeedVal)
-
-        seekSensitivity = findViewById(R.id.seekSensitivity)
-        textSensitivityVal = findViewById(R.id.textSensitivityVal)
-
-        seekShake = findViewById(R.id.seekShake)
-        textShakeVal = findViewById(R.id.textShakeVal)
-
-        initControls()
-        initColorPalette()
+        // Background update check on startup
+        performUpdateCheck(isManual = false)
     }
 
-    private fun initControls() {
-        // Toggle Settings Card
-        btnToggleSettings.setOnClickListener {
-            if (panelSettings.visibility == View.VISIBLE) {
-                panelSettings.visibility = View.GONE
-            } else {
-                panelSettings.visibility = View.VISIBLE
+    private fun initBottomNavViews() {
+        bottomNavBar = findViewById(R.id.bottomNavBar)
+
+        navTabHome = findViewById(R.id.navTabHome)
+        navIconHome = findViewById(R.id.navIconHome)
+        navTextHome = findViewById(R.id.navTextHome)
+
+        navTabWallpaper = findViewById(R.id.navTabWallpaper)
+        navIconWallpaper = findViewById(R.id.navIconWallpaper)
+        navTextWallpaper = findViewById(R.id.navTextWallpaper)
+
+        navTabSettings = findViewById(R.id.navTabSettings)
+        navIconSettings = findViewById(R.id.navIconSettings)
+        navTextSettings = findViewById(R.id.navTextSettings)
+
+        AnimationUtils.attachTactilePress(navTabHome) {
+            navigateToHome()
+        }
+
+        AnimationUtils.attachTactilePress(navTabWallpaper) {
+            navigateToWallpaperList()
+        }
+
+        AnimationUtils.attachTactilePress(navTabSettings) {
+            navigateToSettings()
+        }
+    }
+
+    private fun setupBackStackListener() {
+        supportFragmentManager.addOnBackStackChangedListener {
+            val currentFragment = supportFragmentManager.findFragmentById(R.id.fragmentContainer)
+            updateBottomNavState(currentFragment)
+        }
+        updateBottomNavState(supportFragmentManager.findFragmentById(R.id.fragmentContainer))
+    }
+
+    private fun updateBottomNavState(fragment: Fragment?) {
+        val activeColor = ContextCompat.getColor(this, R.color.brand_milano_red)
+        val inactiveColor = ContextCompat.getColor(this, R.color.text_muted)
+
+        when (fragment) {
+            is HomeDashboardFragment, null -> {
+                bottomNavBar.visibility = View.VISIBLE
+                setTabSelected(isHome = true, isWallpaper = false, isSettings = false, activeColor, inactiveColor)
+            }
+            is WallpaperListFragment -> {
+                bottomNavBar.visibility = View.VISIBLE
+                setTabSelected(isHome = false, isWallpaper = true, isSettings = false, activeColor, inactiveColor)
+            }
+            is SettingsFragment -> {
+                bottomNavBar.visibility = View.VISIBLE
+                setTabSelected(isHome = false, isWallpaper = false, isSettings = true, activeColor, inactiveColor)
+            }
+            is WallpaperPreviewFragment,
+            is WallpaperCustomizeFragment,
+            is ComingSoonFragment -> {
+                // Hide floating bottom nav for total immersion
+                bottomNavBar.visibility = View.GONE
+            }
+            else -> {
+                bottomNavBar.visibility = View.VISIBLE
             }
         }
-
-        // Set as Live Wallpaper
-        btnSetWallpaper.setOnClickListener {
-            openWallpaperChooser()
-        }
-
-        // Simulate Shake impulse
-        btnSimulateShake.setOnClickListener {
-            waterSurfaceView.simulationEngine.applyImpulse(
-                (Math.random().toFloat() - 0.5f) * 750f,
-                -650f
-            )
-            Toast.makeText(this, "Water surged!", Toast.LENGTH_SHORT).show()
-        }
-
-        // Reset to Defaults
-        btnResetDefaults.setOnClickListener {
-            preferences.resetToDefaults()
-            updateUiFromPreferences()
-            waterSurfaceView.simulationEngine.updateSettings(
-                WallpaperPreferences.DEFAULT_WATER_VOLUME,
-                WallpaperPreferences.DEFAULT_PHYSICS_SENSITIVITY,
-                WallpaperPreferences.DEFAULT_SHAKE_SENSITIVITY,
-                WallpaperPreferences.DEFAULT_FLOW_SPEED
-            )
-            Toast.makeText(this, "Reset to authentic Cyan defaults", Toast.LENGTH_SHORT).show()
-        }
-
-        // Volume SeekBar (20% to 70%)
-        val initialVol = (preferences.getWaterVolume() * 100).toInt().coerceIn(20, 70)
-        seekVolume.progress = initialVol
-        textVolumeVal.text = "$initialVol%"
-        seekVolume.setOnSeekBarChangeListener(object : SeekBar.OnSeekBarChangeListener {
-            override fun onProgressChanged(sb: SeekBar?, progress: Int, fromUser: Boolean) {
-                val clamped = progress.coerceAtLeast(15)
-                textVolumeVal.text = "$clamped%"
-                if (fromUser) {
-                    val volFloat = clamped / 100f
-                    preferences.saveFromJson("""{"waterVolume":$volFloat}""")
-                    waterSurfaceView.simulationEngine.initializeParticles(volFloat)
-                }
-            }
-            override fun onStartTrackingTouch(sb: SeekBar?) {}
-            override fun onStopTrackingTouch(sb: SeekBar?) {}
-        })
-
-        // Water Speed / Gravity SeekBar (0.5x to 3.5x, default 2.0x = Real-Time Instant Gravity)
-        val initialSpeed = (preferences.getFlowSpeed() * 100).toInt().coerceIn(50, 350)
-        seekSpeed.progress = initialSpeed
-        textSpeedVal.text = formatSpeedLabel(initialSpeed / 100f)
-        seekSpeed.setOnSeekBarChangeListener(object : SeekBar.OnSeekBarChangeListener {
-            override fun onProgressChanged(sb: SeekBar?, progress: Int, fromUser: Boolean) {
-                val clamped = progress.coerceAtLeast(40)
-                val speedFloat = clamped / 100f
-                textSpeedVal.text = formatSpeedLabel(speedFloat)
-                if (fromUser) {
-                    preferences.saveFromJson("""{"flowSpeed":$speedFloat}""")
-                    waterSurfaceView.simulationEngine.updateSettings(
-                        preferences.getWaterVolume(),
-                        preferences.getPhysicsSensitivity(),
-                        preferences.getShakeSensitivity(),
-                        speedFloat
-                    )
-                }
-            }
-            override fun onStartTrackingTouch(sb: SeekBar?) {}
-            override fun onStopTrackingTouch(sb: SeekBar?) {}
-        })
-
-        // Tilt Sensitivity (0.5x to 2.5x)
-        val initialSens = (preferences.getPhysicsSensitivity() * 100).toInt().coerceIn(50, 250)
-        seekSensitivity.progress = initialSens
-        textSensitivityVal.text = String.format("%.2fx", initialSens / 100f)
-        seekSensitivity.setOnSeekBarChangeListener(object : SeekBar.OnSeekBarChangeListener {
-            override fun onProgressChanged(sb: SeekBar?, progress: Int, fromUser: Boolean) {
-                val clamped = progress.coerceAtLeast(30)
-                val sensFloat = clamped / 100f
-                textSensitivityVal.text = String.format("%.2fx", sensFloat)
-                if (fromUser) {
-                    preferences.saveFromJson("""{"physicsSensitivity":$sensFloat}""")
-                    waterSurfaceView.simulationEngine.updateSettings(
-                        preferences.getWaterVolume(),
-                        sensFloat,
-                        preferences.getShakeSensitivity(),
-                        preferences.getFlowSpeed()
-                    )
-                }
-            }
-            override fun onStartTrackingTouch(sb: SeekBar?) {}
-            override fun onStopTrackingTouch(sb: SeekBar?) {}
-        })
-
-        // Shake Surge (0.5x to 2.0x)
-        val initialShake = (preferences.getShakeSensitivity() * 100).toInt().coerceIn(50, 200)
-        seekShake.progress = initialShake
-        textShakeVal.text = String.format("%.2fx", initialShake / 100f)
-        seekShake.setOnSeekBarChangeListener(object : SeekBar.OnSeekBarChangeListener {
-            override fun onProgressChanged(sb: SeekBar?, progress: Int, fromUser: Boolean) {
-                val clamped = progress.coerceAtLeast(20)
-                val shakeFloat = clamped / 100f
-                textShakeVal.text = String.format("%.2fx", shakeFloat)
-                if (fromUser) {
-                    preferences.saveFromJson("""{"shakeSensitivity":$shakeFloat}""")
-                    waterSurfaceView.simulationEngine.updateSettings(
-                        preferences.getWaterVolume(),
-                        preferences.getPhysicsSensitivity(),
-                        shakeFloat,
-                        preferences.getFlowSpeed()
-                    )
-                }
-            }
-            override fun onStartTrackingTouch(sb: SeekBar?) {}
-            override fun onStopTrackingTouch(sb: SeekBar?) {}
-        })
     }
 
-    private fun formatSpeedLabel(speed: Float): String {
-        return when {
-            speed >= 2.8f -> String.format("%.1fx (Ultra Fast)", speed)
-            speed >= 1.8f -> String.format("%.1fx (Real Water)", speed)
-            speed >= 1.2f -> String.format("%.1fx (Moderate)", speed)
-            else -> String.format("%.1fx (Slow-Mo)", speed)
+    private fun setTabSelected(
+        isHome: Boolean,
+        isWallpaper: Boolean,
+        isSettings: Boolean,
+        activeColor: Int,
+        inactiveColor: Int
+    ) {
+        navIconHome.imageTintList = ColorStateList.valueOf(if (isHome) activeColor else inactiveColor)
+        navTextHome.setTextColor(if (isHome) activeColor else inactiveColor)
+
+        navIconWallpaper.imageTintList = ColorStateList.valueOf(if (isWallpaper) activeColor else inactiveColor)
+        navTextWallpaper.setTextColor(if (isWallpaper) activeColor else inactiveColor)
+
+        navIconSettings.imageTintList = ColorStateList.valueOf(if (isSettings) activeColor else inactiveColor)
+        navTextSettings.setTextColor(if (isSettings) activeColor else inactiveColor)
+    }
+
+    fun navigateToHome() {
+        supportFragmentManager.popBackStack(null, FragmentManager.POP_BACK_STACK_INCLUSIVE)
+        val current = supportFragmentManager.findFragmentById(R.id.fragmentContainer)
+        if (current !is HomeDashboardFragment) {
+            supportFragmentManager.beginTransaction()
+                .setCustomAnimations(android.R.anim.fade_in, android.R.anim.fade_out)
+                .replace(R.id.fragmentContainer, HomeDashboardFragment())
+                .commit()
         }
     }
 
-    private fun initColorPalette() {
-        findViewById<View>(R.id.colorCyan).setOnClickListener {
-            applyWaterColor("#00E5FF", "#00B4D8", "Cyan")
-        }
-        findViewById<View>(R.id.colorAzure).setOnClickListener {
-            applyWaterColor("#00B4D8", "#0077B6", "Azure")
-        }
-        findViewById<View>(R.id.colorViolet).setOnClickListener {
-            applyWaterColor("#7B2CBF", "#5A189A", "Violet")
-        }
-        findViewById<View>(R.id.colorSunset).setOnClickListener {
-            applyWaterColor("#FF6B6B", "#EE5253", "Sunset")
-        }
-        findViewById<View>(R.id.colorEmerald).setOnClickListener {
-            applyWaterColor("#00E676", "#00C853", "Emerald")
-        }
+    fun navigateToWallpaperList() {
+        val current = supportFragmentManager.findFragmentById(R.id.fragmentContainer)
+        if (current is WallpaperListFragment) return
+
+        supportFragmentManager.beginTransaction()
+            .setCustomAnimations(android.R.anim.fade_in, android.R.anim.fade_out)
+            .replace(R.id.fragmentContainer, WallpaperListFragment())
+            .addToBackStack("WallpaperList")
+            .commit()
     }
 
-    private fun applyWaterColor(primaryHex: String, secondaryHex: String, name: String) {
-        preferences.saveFromJson("""{
-            "waterColorHex": "$primaryHex",
-            "waterColorSecondaryHex": "$secondaryHex"
-        }""")
-        Toast.makeText(this, "$name color applied", Toast.LENGTH_SHORT).show()
+    fun navigateToWallpaperPreview() {
+        supportFragmentManager.beginTransaction()
+            .setCustomAnimations(android.R.anim.fade_in, android.R.anim.fade_out)
+            .replace(R.id.fragmentContainer, WallpaperPreviewFragment())
+            .addToBackStack("WallpaperPreview")
+            .commit()
     }
 
-    private fun updateUiFromPreferences() {
-        val vol = (preferences.getWaterVolume() * 100).toInt()
-        seekVolume.progress = vol
-        textVolumeVal.text = "$vol%"
-
-        val spd = (preferences.getFlowSpeed() * 100).toInt()
-        seekSpeed.progress = spd
-        textSpeedVal.text = formatSpeedLabel(spd / 100f)
-
-        val sens = (preferences.getPhysicsSensitivity() * 100).toInt()
-        seekSensitivity.progress = sens
-        textSensitivityVal.text = String.format("%.2fx", sens / 100f)
-
-        val shake = (preferences.getShakeSensitivity() * 100).toInt()
-        seekShake.progress = shake
-        textShakeVal.text = String.format("%.2fx", shake / 100f)
+    fun navigateToWallpaperCustomize() {
+        supportFragmentManager.beginTransaction()
+            .setCustomAnimations(android.R.anim.fade_in, android.R.anim.fade_out)
+            .replace(R.id.fragmentContainer, WallpaperCustomizeFragment())
+            .addToBackStack("WallpaperCustomize")
+            .commit()
     }
 
-    private fun openWallpaperChooser() {
+    fun navigateToComingSoon(title: String, stickerResId: Int, desc: String) {
+        supportFragmentManager.beginTransaction()
+            .setCustomAnimations(android.R.anim.fade_in, android.R.anim.fade_out)
+            .replace(R.id.fragmentContainer, ComingSoonFragment.newInstance(title, stickerResId, desc))
+            .addToBackStack("ComingSoon_$title")
+            .commit()
+    }
+
+    fun navigateToSettings() {
+        val current = supportFragmentManager.findFragmentById(R.id.fragmentContainer)
+        if (current is SettingsFragment) return
+
+        supportFragmentManager.beginTransaction()
+            .setCustomAnimations(android.R.anim.fade_in, android.R.anim.fade_out)
+            .replace(R.id.fragmentContainer, SettingsFragment())
+            .addToBackStack("Settings")
+            .commit()
+    }
+
+    fun openWallpaperChooser() {
         try {
             val component = ComponentName(this, WaterWallpaperService::class.java)
             val intent = Intent(WallpaperManager.ACTION_CHANGE_LIVE_WALLPAPER).apply {
@@ -273,13 +300,154 @@ class MainActivity : AppCompatActivity() {
         }
     }
 
-    override fun onResume() {
-        super.onResume()
-        waterSurfaceView.startSensors()
+    fun performUpdateCheck(isManual: Boolean) {
+        updateManager.checkForUpdates(BuildConfig.VERSION_CODE) { state ->
+            when (state) {
+                is UpdateState.Checking -> {}
+                is UpdateState.UpdateAvailable -> {
+                    showUpdateDialog(state.info)
+                }
+                is UpdateState.ReadyToInstall -> {
+                    showUpdateDialog(state.info)
+                }
+                is UpdateState.UpToDate -> {
+                    if (isManual) {
+                        Toast.makeText(this, "Live WaterPaper is up to date!", Toast.LENGTH_SHORT).show()
+                    }
+                }
+                is UpdateState.Error -> {
+                    if (isManual) {
+                        Toast.makeText(this, "Update check failed: ${state.message}", Toast.LENGTH_SHORT).show()
+                    }
+                }
+                else -> {}
+            }
+        }
     }
 
-    override fun onPause() {
-        super.onPause()
-        waterSurfaceView.stopSensors()
+    private fun showUpdateDialog(info: UpdateInfo) {
+        val dialogView = LayoutInflater.from(this).inflate(R.layout.dialog_update, null)
+        val textTitle = dialogView.findViewById<TextView>(R.id.textDialogTitle)
+        val textVersion = dialogView.findViewById<TextView>(R.id.textDialogVersion)
+        val textNotes = dialogView.findViewById<TextView>(R.id.textDialogNotes)
+        val containerProgress = dialogView.findViewById<LinearLayout>(R.id.containerDownloadProgress)
+        val progressBar = dialogView.findViewById<ProgressBar>(R.id.progressDownload)
+        val textProgressStatus = dialogView.findViewById<TextView>(R.id.textDownloadStatus)
+        val btnLater = dialogView.findViewById<Button>(R.id.btnDialogLater)
+        val btnAction = dialogView.findViewById<Button>(R.id.btnDialogAction)
+
+        textTitle.text = if (info.releaseName.isNotBlank()) info.releaseName else "Update Available"
+        textVersion.text = "Version ${info.versionName} (Build ${info.versionCode})"
+        textNotes.text = info.releaseNotes
+
+        val dialog = AlertDialog.Builder(this)
+            .setView(dialogView)
+            .setCancelable(false)
+            .create()
+
+        dialog.window?.setBackgroundDrawableResource(android.R.color.transparent)
+
+        btnLater.setOnClickListener {
+            dialog.dismiss()
+        }
+
+        fun updateUiForState(state: UpdateState) {
+            when (state) {
+                is UpdateState.UpdateAvailable -> {
+                    btnAction.text = "UPDATE NOW"
+                    btnAction.isEnabled = true
+                    containerProgress.visibility = View.GONE
+                }
+                is UpdateState.Downloading -> {
+                    btnAction.isEnabled = false
+                    btnAction.text = "DOWNLOADING..."
+                    containerProgress.visibility = View.VISIBLE
+                    progressBar.progress = state.percentage
+                    val mbDownloaded = state.downloadedBytes / (1024f * 1024f)
+                    val mbTotal = state.totalBytes / (1024f * 1024f)
+                    textProgressStatus.text = String.format(
+                        "Downloading: %d%% (%.1f MB / %.1f MB)",
+                        state.percentage,
+                        mbDownloaded,
+                        mbTotal
+                    )
+                }
+                is UpdateState.ReadyToInstall -> {
+                    btnAction.isEnabled = true
+                    btnAction.text = "INSTALL NOW"
+                    containerProgress.visibility = View.GONE
+                    btnAction.setOnClickListener {
+                        val installed = updateManager.installUpdate(this) {
+                            Toast.makeText(
+                                this,
+                                "Please grant permission to install updates",
+                                Toast.LENGTH_LONG
+                            ).show()
+                            UpdateInstaller.openInstallPermissionSettings(this)
+                        }
+                        if (installed) {
+                            dialog.dismiss()
+                        }
+                    }
+                }
+                is UpdateState.Error -> {
+                    btnAction.isEnabled = true
+                    btnAction.text = "RETRY"
+                    containerProgress.visibility = View.GONE
+                    Toast.makeText(this, "Error: ${state.message}", Toast.LENGTH_LONG).show()
+                }
+                else -> {}
+            }
+        }
+
+        if (updateManager.currentState is UpdateState.ReadyToInstall) {
+            updateUiForState(updateManager.currentState)
+        } else {
+            btnAction.setOnClickListener {
+                updateManager.startDownload(info) { state ->
+                    updateUiForState(state)
+                    if (state is UpdateState.ReadyToInstall) {
+                        val installed = updateManager.installUpdate(this) {
+                            Toast.makeText(
+                                this,
+                                "Please grant permission to install updates",
+                                Toast.LENGTH_LONG
+                            ).show()
+                            UpdateInstaller.openInstallPermissionSettings(this)
+                        }
+                        if (installed) {
+                            dialog.dismiss()
+                        }
+                    }
+                }
+            }
+        }
+
+        dialog.show()
+    }
+
+    override fun onActivityResult(requestCode: Int, resultCode: Int, data: Intent?) {
+        super.onActivityResult(requestCode, resultCode, data)
+        if (requestCode == UpdateInstaller.REQUEST_CODE_UNKNOWN_APPS) {
+            if (UpdateInstaller.canRequestPackageInstalls(this)) {
+                updateManager.installUpdate(this) {}
+            } else {
+                Toast.makeText(this, "Install permission not granted", Toast.LENGTH_SHORT).show()
+            }
+        }
+    }
+
+    @Deprecated("Deprecated in Java")
+    override fun onBackPressed() {
+        val currentFragment = supportFragmentManager.findFragmentById(R.id.fragmentContainer)
+        if (currentFragment is WallpaperPreviewFragment && currentFragment.handleBackPress()) {
+            return
+        }
+
+        if (supportFragmentManager.backStackEntryCount > 0) {
+            supportFragmentManager.popBackStack()
+        } else {
+            super.onBackPressed()
+        }
     }
 }

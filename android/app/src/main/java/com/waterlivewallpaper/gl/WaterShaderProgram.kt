@@ -34,6 +34,10 @@ class WaterShaderProgram {
         private set
     var uIsoGlowIntensityLoc: Int = -1
         private set
+    var uIsoBackgroundTextureLoc: Int = -1
+        private set
+    var uIsoHasCustomBgLoc: Int = -1
+        private set
 
     fun initialize(): Boolean {
         // 1. Build Density Splat Program
@@ -80,6 +84,8 @@ class WaterShaderProgram {
         uIsoSecondaryColorLoc = GLES20.glGetUniformLocation(isoProgramId, "u_SecondaryColor")
         uIsoBackgroundColorLoc = GLES20.glGetUniformLocation(isoProgramId, "u_BackgroundColor")
         uIsoGlowIntensityLoc = GLES20.glGetUniformLocation(isoProgramId, "u_GlowIntensity")
+        uIsoBackgroundTextureLoc = GLES20.glGetUniformLocation(isoProgramId, "u_BackgroundTexture")
+        uIsoHasCustomBgLoc = GLES20.glGetUniformLocation(isoProgramId, "u_HasCustomBackground")
 
         return true
     }

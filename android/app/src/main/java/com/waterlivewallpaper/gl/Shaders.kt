@@ -55,6 +55,8 @@ object Shaders {
         precision mediump float;
 
         uniform sampler2D u_DensityTexture;
+        uniform sampler2D u_BackgroundTexture;
+        uniform int u_HasCustomBackground;
         uniform vec4 u_WaterColor;
         uniform vec4 u_SecondaryColor;
         uniform vec4 u_BackgroundColor;
@@ -67,13 +69,21 @@ object Shaders {
             vec2 uv = v_TexCoord;
             float density = texture2D(u_DensityTexture, uv).r;
 
+            // Resolve background color: either custom bitmap texture (with inverted Y for Bitmap orientation) or solid background color
+            vec4 bgColor;
+            if (u_HasCustomBackground == 1) {
+                bgColor = texture2D(u_BackgroundTexture, vec2(uv.x, 1.0 - uv.y));
+            } else {
+                bgColor = u_BackgroundColor;
+            }
+
             // Thresholds for metaball isosurface
             float liquidThreshold = 0.38;
             float glowThreshold = 0.06;
 
             if (density < glowThreshold) {
                 // Background
-                gl_FragColor = u_BackgroundColor;
+                gl_FragColor = bgColor;
                 return;
             }
 
@@ -89,14 +99,14 @@ object Shaders {
                 float surfaceHighlight = smoothstep(liquidThreshold, liquidThreshold + 0.12, density) * (1.0 - smoothstep(liquidThreshold + 0.12, liquidThreshold + 0.28, density));
                 liquidRgb += vec3(0.12, 0.22, 0.25) * surfaceHighlight;
 
-                vec3 finalRgb = mix(u_BackgroundColor.rgb, liquidRgb, edgeAlpha);
+                vec3 finalRgb = mix(bgColor.rgb, liquidRgb, edgeAlpha);
                 gl_FragColor = vec4(finalRgb, 1.0);
             } else {
                 // Soft luminous cyan glow along the outer liquid meniscus
                 float glowFactor = smoothstep(glowThreshold, liquidThreshold, density);
                 float glowAlpha = pow(glowFactor, 1.4) * u_GlowIntensity * 0.85;
 
-                vec3 finalRgb = mix(u_BackgroundColor.rgb, u_WaterColor.rgb, glowAlpha);
+                vec3 finalRgb = mix(bgColor.rgb, u_WaterColor.rgb, glowAlpha);
                 gl_FragColor = vec4(finalRgb, 1.0);
             }
         }

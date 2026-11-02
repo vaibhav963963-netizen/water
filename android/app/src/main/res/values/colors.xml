@@ -1,7 +1,60 @@
+<?xml version="1.0" encoding="utf-8"?>
 <resources>
-    <color name="primary">#00B4D8</color>
-    <color name="primary_cyan">#00E5FF</color>
-    <color name="primary_dark">#0077B6</color>
-    <color name="background_light">#F2F5F8</color>
-    <color name="background_dark">#0F172A</color>
+    <!-- Primary Brand Identity -->
+    <color name="brand_milano_red">#A90E02</color>
+    <color name="milano_red">#A90E02</color>
+    <color name="brand_milano_red_dark">#800A01</color>
+    <color name="brand_milano_red_light">#C81D0F</color>
+    <color name="brand_milano_red_subtle">#1AA90E02</color>
+
+    <color name="brand_lemon_chiffon">#FFFBD4</color>
+    <color name="lemon_chiffon">#FFFBD4</color>
+    <color name="brand_lemon_chiffon_dark">#F7F1BE</color>
+    <color name="soft_cream">#F5EDCC</color>
+    <color name="card_border">#E5CD91</color>
+    <color name="primary_cyan">#A90E02</color>
+    <color name="glass_stroke">#E5CD91</color>
+    <color name="glass_stroke_light">#4DE5CD91</color>
+    <color name="glass_stroke_cyan">#A90E02</color>
+    <color name="glass_stroke_subtle">#1A292421</color>
+    <color name="bg_card_glass">#FFFEF7</color>
+    <color name="background_light">#FAF5E0</color>
+
+    <!-- Supporting Natural Tones -->
+    <color name="brand_deep_black">#171311</color>
+    <color name="brand_charcoal">#292421</color>
+    <color name="brand_charcoal_light">#3D3632</color>
+    <color name="brand_charcoal_card">#211D1B</color>
+
+    <color name="brand_warm_white">#FFFEF7</color>
+    <color name="brand_soft_cream">#F5EDCC</color>
+    <color name="brand_soft_cream_subtle">#FAF5E0</color>
+
+    <color name="brand_muted_gold">#C49A45</color>
+    <color name="brand_champagne_gold">#E5CD91</color>
+
+    <color name="brand_warm_grey">#82796F</color>
+    <color name="brand_warm_grey_light">#E0D9CE</color>
+    <color name="brand_border_subtle">#1A292421</color>
+    <color name="brand_border_gold">#4DE5CD91</color>
+    <color name="brand_border_red">#33A90E02</color>
+
+    <!-- Semantic Theme Mapping -->
+    <color name="bg_canvas">#FAF5E0</color>
+    <color name="bg_card_cream">#FFFBD4</color>
+    <color name="bg_card_white">#FFFEF7</color>
+    <color name="bg_card_charcoal">#292421</color>
+    <color name="bg_card_red">#A90E02</color>
+
+    <color name="text_display">#171311</color>
+    <color name="text_primary">#292421</color>
+    <color name="text_secondary">#82796F</color>
+    <color name="text_muted">#A39B92</color>
+    <color name="text_light_primary">#FFFBD4</color>
+    <color name="text_light_secondary">#E5CD91</color>
+    <color name="text_red_accent">#A90E02</color>
+
+    <!-- Success & Status -->
+    <color name="accent_emerald">#1E7E34</color>
+    <color name="accent_rose">#A90E02</color>
 </resources>

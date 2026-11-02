@@ -1,0 +1,53 @@
+<?xml version="1.0" encoding="utf-8"?>
+<vector xmlns:android="http://schemas.android.com/apk/res/android"
+    android:width="96dp"
+    android:height="96dp"
+    android:viewportWidth="96"
+    android:viewportHeight="96">
+
+    <!-- Soft Drop Shadow -->
+    <path
+        android:fillColor="#26292421"
+        android:pathData="M16,84 C32,84 64,84 80,84 C86,84 90,86 90,88 C90,90 86,92 80,92 C64,92 32,92 16,92 C10,92 6,90 6,88 C6,86 10,84 16,84 Z" />
+
+    <!-- Top Handle (Charcoal 3D) -->
+    <path
+        android:fillColor="#292421"
+        android:pathData="M34,22 C34,17 40,14 48,14 C56,14 62,17 62,22 L62,28 L56,28 L56,22 C56,20 52,18 48,18 C44,18 40,20 40,22 L40,28 L34,28 Z" />
+
+    <!-- Toolbox Lid (Milano Red Dark) -->
+    <path
+        android:fillColor="#800A01"
+        android:pathData="M14,28 L82,28 C86,28 89,31 88,35 L86,46 L10,46 L8,35 C7,31 10,28 14,28 Z" />
+
+    <!-- Toolbox Lower Body (Milano Red) -->
+    <path
+        android:fillColor="#A90E02"
+        android:pathData="M10,46 L86,46 L84,76 C84,80 80,84 76,84 L20,84 C16,84 12,80 12,76 L10,46 Z" />
+
+    <!-- Metal Center Clasp (Champagne Gold) -->
+    <path
+        android:fillColor="#E5CD91"
+        android:pathData="M44,40 L52,40 C54,40 55,41 55,43 L55,54 C55,56 54,57 52,57 L44,57 C42,57 41,56 41,54 L41,43 C41,41 42,40 44,40 Z" />
+    <path
+        android:fillColor="#C49A45"
+        android:pathData="M46,47 L50,47 C51,47 51,48 51,49 L51,52 C51,53 51,53 50,53 L46,53 C45,53 45,53 45,52 L45,49 C45,48 45,47 46,47 Z" />
+
+    <!-- Glossy Lemon Chiffon Highlight along Rim -->
+    <path
+        android:fillColor="#60FFFBD4"
+        android:pathData="M12,50 L84,50 L84,53 L12,53 Z" />
+
+    <!-- Golden Wand Peeking Out (Champagne Gold & Lemon Chiffon) -->
+    <path
+        android:fillColor="#E5CD91"
+        android:pathData="M72,32 L88,16 L91,19 L75,35 Z" />
+    <path
+        android:fillColor="#FFFBD4"
+        android:pathData="M84,20 L88,16 L91,19 L87,23 Z" />
+
+    <!-- Wand Star Tip (Muted Gold) -->
+    <path
+        android:fillColor="#C49A45"
+        android:pathData="M89,14 C89,17 91,18 94,18 C91,18 89,19 89,22 C89,19 87,18 84,18 C87,18 89,17 89,14 Z" />
+</vector>

@@ -1,0 +1,118 @@
+<?xml version="1.0" encoding="utf-8"?>
+<FrameLayout xmlns:android="http://schemas.android.com/apk/res/android"
+    android:layout_width="match_parent"
+    android:layout_height="match_parent"
+    android:background="@color/brand_charcoal">
+
+    <!-- Real OpenGL Fluid Simulation Surface -->
+    <com.waterlivewallpaper.view.WaterSurfaceView
+        android:id="@+id/waterSurfaceView"
+        android:layout_width="match_parent"
+        android:layout_height="match_parent" />
+
+    <!-- Top Minimal HUD -->
+    <LinearLayout
+        android:id="@+id/previewTopControls"
+        android:layout_width="match_parent"
+        android:layout_height="wrap_content"
+        android:orientation="horizontal"
+        android:gravity="center_vertical"
+        android:paddingStart="16dp"
+        android:paddingEnd="16dp"
+        android:paddingTop="48dp"
+        android:layout_gravity="top">
+
+        <ImageView
+            android:id="@+id/btnPreviewBack"
+            android:layout_width="42dp"
+            android:layout_height="42dp"
+            android:background="@drawable/btn_icon_circle"
+            android:src="@drawable/ic_back_arrow"
+            android:padding="11dp"
+            android:contentDescription="Back" />
+
+        <TextView
+            android:layout_width="0dp"
+            android:layout_height="wrap_content"
+            android:layout_weight="1"
+            android:text="Liquid Fluid Wallpaper"
+            android:textSize="17sp"
+            android:textStyle="bold"
+            android:textColor="@color/text_display"
+            android:layout_marginStart="14dp" />
+
+        <!-- Fullscreen Toggle Icon -->
+        <ImageView
+            android:id="@+id/btnToggleFullscreen"
+            android:layout_width="42dp"
+            android:layout_height="42dp"
+            android:background="@drawable/btn_icon_circle"
+            android:src="@drawable/ic_fullscreen"
+            android:padding="11dp"
+            android:contentDescription="Fullscreen Toggle" />
+    </LinearLayout>
+
+    <!-- Bottom Floating Minimal Control Card -->
+    <LinearLayout
+        android:id="@+id/previewBottomControls"
+        android:layout_width="match_parent"
+        android:layout_height="wrap_content"
+        android:orientation="vertical"
+        android:background="@drawable/card_module_charcoal"
+        android:padding="20dp"
+        android:layout_gravity="bottom"
+        android:layout_marginStart="20dp"
+        android:layout_marginEnd="20dp"
+        android:layout_marginBottom="28dp">
+
+        <TextView
+            android:layout_width="wrap_content"
+            android:layout_height="wrap_content"
+            android:text="Liquid Fluid Wallpaper"
+            android:textSize="18sp"
+            android:textStyle="bold"
+            android:textColor="@color/brand_lemon_chiffon" />
+
+        <TextView
+            android:layout_width="wrap_content"
+            android:layout_height="wrap_content"
+            android:text="Tilt phone to slosh liquid • Shake for splashes • Tap to ripple"
+            android:textSize="12sp"
+            android:textColor="@color/brand_champagne_gold"
+            android:layout_marginTop="3dp"
+            android:layout_marginBottom="18dp" />
+
+        <LinearLayout
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:orientation="horizontal"
+            android:weightSum="2">
+
+            <!-- Secondary Action: Lemon Chiffon Background with Milano Red Border -->
+            <Button
+                android:id="@+id/btnPreviewCustomize"
+                android:layout_width="0dp"
+                android:layout_height="46dp"
+                android:layout_weight="1"
+                android:text="Customize"
+                android:textSize="13sp"
+                android:textStyle="bold"
+                android:textColor="@color/brand_milano_red"
+                android:background="@drawable/btn_secondary_cream"
+                android:layout_marginEnd="8dp" />
+
+            <!-- Primary Action: Milano Red Background with Lemon Chiffon Text -->
+            <Button
+                android:id="@+id/btnPreviewApply"
+                android:layout_width="0dp"
+                android:layout_height="46dp"
+                android:layout_weight="1"
+                android:text="Apply Wallpaper"
+                android:textSize="13sp"
+                android:textStyle="bold"
+                android:textColor="@color/brand_lemon_chiffon"
+                android:background="@drawable/btn_primary_red"
+                android:layout_marginStart="8dp" />
+        </LinearLayout>
+    </LinearLayout>
+</FrameLayout>

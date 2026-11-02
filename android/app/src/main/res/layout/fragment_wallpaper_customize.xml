@@ -1,0 +1,436 @@
+<?xml version="1.0" encoding="utf-8"?>
+<ScrollView xmlns:android="http://schemas.android.com/apk/res/android"
+    android:id="@+id/scrollCustomize"
+    android:layout_width="match_parent"
+    android:layout_height="match_parent"
+    android:fillViewport="true"
+    android:scrollbars="none"
+    android:background="@color/bg_canvas">
+
+    <LinearLayout
+        android:layout_width="match_parent"
+        android:layout_height="wrap_content"
+        android:orientation="vertical"
+        android:paddingStart="22dp"
+        android:paddingEnd="22dp"
+        android:paddingTop="50dp"
+        android:paddingBottom="50dp">
+
+        <!-- Header: Back Button, Title & Reset -->
+        <LinearLayout
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:orientation="horizontal"
+            android:gravity="center_vertical"
+            android:layout_marginBottom="24dp">
+
+            <ImageView
+                android:id="@+id/btnCustomizeBack"
+                android:layout_width="42dp"
+                android:layout_height="42dp"
+                android:background="@drawable/btn_icon_circle"
+                android:src="@drawable/ic_back_arrow"
+                android:padding="11dp"
+                android:layout_marginEnd="14dp"
+                android:contentDescription="Back" />
+
+            <LinearLayout
+                android:layout_width="0dp"
+                android:layout_height="wrap_content"
+                android:layout_weight="1"
+                android:orientation="vertical">
+
+                <TextView
+                    android:layout_width="wrap_content"
+                    android:layout_height="wrap_content"
+                    android:text="Customize Liquid"
+                    android:textSize="22sp"
+                    android:textStyle="bold"
+                    android:textColor="@color/text_display" />
+
+                <TextView
+                    android:layout_width="wrap_content"
+                    android:layout_height="wrap_content"
+                    android:text="Fine-tune physics, speed &amp; fluid color"
+                    android:textSize="12sp"
+                    android:textColor="@color/text_secondary" />
+            </LinearLayout>
+
+            <Button
+                android:id="@+id/btnCustomizeReset"
+                android:layout_width="wrap_content"
+                android:layout_height="36dp"
+                android:text="Reset"
+                android:textSize="11sp"
+                android:textStyle="bold"
+                android:textColor="@color/brand_milano_red"
+                android:background="@drawable/btn_secondary_cream"
+                android:paddingStart="12dp"
+                android:paddingEnd="12dp" />
+        </LinearLayout>
+
+        <!-- Color Presets Card -->
+        <LinearLayout
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:orientation="vertical"
+            android:background="@drawable/card_clean_white"
+            android:padding="18dp"
+            android:layout_marginBottom="18dp">
+
+            <TextView
+                android:layout_width="wrap_content"
+                android:layout_height="wrap_content"
+                android:text="FLUID COLOR PALETTE"
+                android:textSize="11sp"
+                android:textStyle="bold"
+                android:textColor="@color/brand_warm_grey"
+                android:letterSpacing="0.08"
+                android:layout_marginBottom="14dp" />
+
+            <LinearLayout
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:orientation="horizontal"
+                android:gravity="center"
+                android:weightSum="5">
+
+                <View
+                    android:id="@+id/colorMilanoRed"
+                    android:layout_width="44dp"
+                    android:layout_height="44dp"
+                    android:background="@drawable/circle_milano_red"
+                    android:clickable="true"
+                    android:focusable="true"
+                    android:layout_margin="4dp" />
+
+                <View
+                    android:id="@+id/colorCrimson"
+                    android:layout_width="44dp"
+                    android:layout_height="44dp"
+                    android:background="@drawable/circle_crimson"
+                    android:clickable="true"
+                    android:focusable="true"
+                    android:layout_margin="4dp" />
+
+                <View
+                    android:id="@+id/colorGold"
+                    android:layout_width="44dp"
+                    android:layout_height="44dp"
+                    android:background="@drawable/circle_gold"
+                    android:clickable="true"
+                    android:focusable="true"
+                    android:layout_margin="4dp" />
+
+                <View
+                    android:id="@+id/colorLemonChiffon"
+                    android:layout_width="44dp"
+                    android:layout_height="44dp"
+                    android:background="@drawable/circle_lemon_chiffon"
+                    android:clickable="true"
+                    android:focusable="true"
+                    android:layout_margin="4dp" />
+
+                <View
+                    android:id="@+id/colorCharcoal"
+                    android:layout_width="44dp"
+                    android:layout_height="44dp"
+                    android:background="@drawable/circle_charcoal"
+                    android:clickable="true"
+                    android:focusable="true"
+                    android:layout_margin="4dp" />
+            </LinearLayout>
+        </LinearLayout>
+
+        <!-- BACKGROUND IMAGE SECTION -->
+        <LinearLayout
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:orientation="vertical"
+            android:background="@drawable/card_clean_white"
+            android:padding="18dp"
+            android:layout_marginBottom="18dp">
+
+            <TextView
+                android:layout_width="wrap_content"
+                android:layout_height="wrap_content"
+                android:text="BACKGROUND IMAGE"
+                android:textSize="11sp"
+                android:textStyle="bold"
+                android:textColor="@color/brand_milano_red"
+                android:letterSpacing="0.08" />
+
+            <TextView
+                android:layout_width="wrap_content"
+                android:layout_height="wrap_content"
+                android:text="Choose your own image as the wallpaper background."
+                android:textSize="12sp"
+                android:textColor="@color/text_secondary"
+                android:layout_marginTop="2dp"
+                android:layout_marginBottom="14dp" />
+
+            <!-- Current Background Preview Container -->
+            <LinearLayout
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:orientation="horizontal"
+                android:gravity="center_vertical"
+                android:background="@drawable/card_module_soft_cream"
+                android:padding="12dp"
+                android:layout_marginBottom="14dp">
+
+                <ImageView
+                    android:id="@+id/imgBgPreview"
+                    android:layout_width="54dp"
+                    android:layout_height="54dp"
+                    android:scaleType="centerCrop"
+                    android:background="@drawable/wallpaper_thumb"
+                    android:contentDescription="Current Background Preview" />
+
+                <LinearLayout
+                    android:layout_width="0dp"
+                    android:layout_height="wrap_content"
+                    android:layout_weight="1"
+                    android:orientation="vertical"
+                    android:layout_marginStart="14dp">
+
+                    <TextView
+                        android:id="@+id/textBgStatusTitle"
+                        android:layout_width="wrap_content"
+                        android:layout_height="wrap_content"
+                        android:text="Default Canvas"
+                        android:textSize="13sp"
+                        android:textStyle="bold"
+                        android:textColor="@color/text_display" />
+
+                    <TextView
+                        android:id="@+id/textBgStatusSubtitle"
+                        android:layout_width="wrap_content"
+                        android:layout_height="wrap_content"
+                        android:text="No personal photograph set"
+                        android:textSize="11sp"
+                        android:textColor="@color/text_secondary"
+                        android:layout_marginTop="2dp" />
+                </LinearLayout>
+            </LinearLayout>
+
+            <!-- Buttons: Choose/Change Image and Remove Custom Background -->
+            <LinearLayout
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:orientation="horizontal">
+
+                <Button
+                    android:id="@+id/btnChooseBgImage"
+                    android:layout_width="0dp"
+                    android:layout_height="44dp"
+                    android:layout_weight="1"
+                    android:text="Choose Background Image"
+                    android:textSize="12sp"
+                    android:textStyle="bold"
+                    android:textColor="@color/brand_lemon_chiffon"
+                    android:background="@drawable/btn_primary_red" />
+
+                <Button
+                    android:id="@+id/btnRemoveBgImage"
+                    android:layout_width="wrap_content"
+                    android:layout_height="44dp"
+                    android:text="Remove"
+                    android:textSize="12sp"
+                    android:textStyle="bold"
+                    android:textColor="@color/brand_milano_red"
+                    android:background="@drawable/btn_secondary_cream"
+                    android:paddingStart="14dp"
+                    android:paddingEnd="14dp"
+                    android:layout_marginStart="8dp"
+                    android:visibility="gone" />
+            </LinearLayout>
+        </LinearLayout>
+
+        <!-- Physics Tuning Sliders Card -->
+        <LinearLayout
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:orientation="vertical"
+            android:background="@drawable/card_clean_white"
+            android:padding="20dp"
+            android:layout_marginBottom="22dp">
+
+            <!-- Volume Slider -->
+            <LinearLayout
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:orientation="horizontal"
+                android:layout_marginBottom="6dp">
+
+                <TextView
+                    android:layout_width="0dp"
+                    android:layout_height="wrap_content"
+                    android:layout_weight="1"
+                    android:text="Water Volume"
+                    android:textSize="13sp"
+                    android:textStyle="bold"
+                    android:textColor="@color/text_primary" />
+
+                <TextView
+                    android:id="@+id/textVolumeVal"
+                    android:layout_width="wrap_content"
+                    android:layout_height="wrap_content"
+                    android:text="45%"
+                    android:textSize="13sp"
+                    android:textStyle="bold"
+                    android:textColor="@color/brand_milano_red" />
+            </LinearLayout>
+
+            <SeekBar
+                android:id="@+id/seekVolume"
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:max="70"
+                android:progress="45"
+                android:progressTint="@color/brand_milano_red"
+                android:thumbTint="@color/brand_milano_red"
+                android:layout_marginBottom="18dp" />
+
+            <!-- Flow Speed Slider -->
+            <LinearLayout
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:orientation="horizontal"
+                android:layout_marginBottom="6dp">
+
+                <TextView
+                    android:layout_width="0dp"
+                    android:layout_height="wrap_content"
+                    android:layout_weight="1"
+                    android:text="Flow Speed (Physics Clock)"
+                    android:textSize="13sp"
+                    android:textStyle="bold"
+                    android:textColor="@color/text_primary" />
+
+                <TextView
+                    android:id="@+id/textSpeedVal"
+                    android:layout_width="wrap_content"
+                    android:layout_height="wrap_content"
+                    android:text="1.8x (Real Water)"
+                    android:textSize="13sp"
+                    android:textStyle="bold"
+                    android:textColor="@color/brand_milano_red" />
+            </LinearLayout>
+
+            <SeekBar
+                android:id="@+id/seekSpeed"
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:max="350"
+                android:progress="180"
+                android:progressTint="@color/brand_milano_red"
+                android:thumbTint="@color/brand_milano_red"
+                android:layout_marginBottom="18dp" />
+
+            <!-- Tilt Sensitivity Slider -->
+            <LinearLayout
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:orientation="horizontal"
+                android:layout_marginBottom="6dp">
+
+                <TextView
+                    android:layout_width="0dp"
+                    android:layout_height="wrap_content"
+                    android:layout_weight="1"
+                    android:text="Gravity &amp; Tilt Sensitivity"
+                    android:textSize="13sp"
+                    android:textStyle="bold"
+                    android:textColor="@color/text_primary" />
+
+                <TextView
+                    android:id="@+id/textSensitivityVal"
+                    android:layout_width="wrap_content"
+                    android:layout_height="wrap_content"
+                    android:text="1.15x"
+                    android:textSize="13sp"
+                    android:textStyle="bold"
+                    android:textColor="@color/brand_milano_red" />
+            </LinearLayout>
+
+            <SeekBar
+                android:id="@+id/seekSensitivity"
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:max="200"
+                android:progress="115"
+                android:progressTint="@color/brand_milano_red"
+                android:thumbTint="@color/brand_milano_red"
+                android:layout_marginBottom="18dp" />
+
+            <!-- Shake Surge Slider -->
+            <LinearLayout
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:orientation="horizontal"
+                android:layout_marginBottom="6dp">
+
+                <TextView
+                    android:layout_width="0dp"
+                    android:layout_height="wrap_content"
+                    android:layout_weight="1"
+                    android:text="Shake Surge &amp; Splash Detach"
+                    android:textSize="13sp"
+                    android:textStyle="bold"
+                    android:textColor="@color/text_primary" />
+
+                <TextView
+                    android:id="@+id/textShakeVal"
+                    android:layout_width="wrap_content"
+                    android:layout_height="wrap_content"
+                    android:text="0.65x"
+                    android:textSize="13sp"
+                    android:textStyle="bold"
+                    android:textColor="@color/brand_milano_red" />
+            </LinearLayout>
+
+            <SeekBar
+                android:id="@+id/seekShake"
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:max="160"
+                android:progress="65"
+                android:progressTint="@color/brand_milano_red"
+                android:thumbTint="@color/brand_milano_red" />
+        </LinearLayout>
+
+        <!-- Actions: Test Splash & Apply Buttons -->
+        <LinearLayout
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:orientation="horizontal"
+            android:weightSum="2">
+
+            <Button
+                android:id="@+id/btnCustomizeSplash"
+                android:layout_width="0dp"
+                android:layout_height="48dp"
+                android:layout_weight="1"
+                android:text="Test Splash"
+                android:textSize="13sp"
+                android:textStyle="bold"
+                android:textColor="@color/brand_milano_red"
+                android:background="@drawable/btn_secondary_cream"
+                android:layout_marginEnd="8dp" />
+
+            <Button
+                android:id="@+id/btnCustomizeApply"
+                android:layout_width="0dp"
+                android:layout_height="48dp"
+                android:layout_weight="1"
+                android:text="Apply Wallpaper"
+                android:textSize="13sp"
+                android:textStyle="bold"
+                android:textColor="@color/brand_lemon_chiffon"
+                android:background="@drawable/btn_primary_red"
+                android:layout_marginStart="8dp" />
+        </LinearLayout>
+
+    </LinearLayout>
+</ScrollView>

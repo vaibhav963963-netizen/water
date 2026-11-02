@@ -1,0 +1,48 @@
+<?xml version="1.0" encoding="utf-8"?>
+<vector xmlns:android="http://schemas.android.com/apk/res/android"
+    android:width="96dp"
+    android:height="96dp"
+    android:viewportWidth="96"
+    android:viewportHeight="96">
+
+    <!-- Soft Drop Shadow -->
+    <path
+        android:fillColor="#26292421"
+        android:pathData="M16,84 C32,84 64,84 80,84 C86,84 90,86 90,88 C90,90 86,92 80,92 C64,92 32,92 16,92 C10,92 6,90 6,88 C6,86 10,84 16,84 Z" />
+
+    <!-- Back Flap with Tab (Deep Charcoal) -->
+    <path
+        android:fillColor="#211D1B"
+        android:pathData="M18,30 L40,30 L46,36 L78,36 C82,36 86,40 86,44 L86,76 C86,80 82,84 78,84 L18,84 C14,84 10,80 10,76 L10,38 C10,34 14,30 18,30 Z" />
+
+    <!-- Layered Paper Sheets Peeking Out (Lemon Chiffon & Warm White) -->
+    <path
+        android:fillColor="#FFFBD4"
+        android:pathData="M22,26 L74,26 C76,26 78,28 78,30 L78,50 L18,50 L18,30 C18,28 20,26 22,26 Z" />
+    <path
+        android:fillColor="#FFFEF7"
+        android:pathData="M26,22 L70,22 C72,22 74,24 74,26 L74,36 L22,36 L22,26 C22,24 24,22 26,22 Z" />
+
+    <!-- Front Folder Body (Charcoal 3D) -->
+    <path
+        android:fillColor="#292421"
+        android:pathData="M12,42 L42,42 L48,46 L84,46 C87,46 90,49 90,52 L88,78 C88,82 84,86 80,86 L16,86 C12,86 8,82 8,78 L10,48 C10,45 11,42 12,42 Z" />
+
+    <!-- Golden Highlight Trim across Front Flap (Champagne Gold) -->
+    <path
+        android:fillColor="#E5CD91"
+        android:pathData="M14,48 L84,50 L84,53 L14,51 Z" />
+
+    <!-- Milano Red Badge on Folder Front -->
+    <path
+        android:fillColor="#A90E02"
+        android:pathData="M48,58 A6,6 0 1,0 48,70 A6,6 0 1,0 48,58 Z" />
+    <path
+        android:fillColor="#FFFBD4"
+        android:pathData="M48,61 L49,63 L51,64 L49,65 L48,67 L47,65 L45,64 L47,63 Z" />
+
+    <!-- Floating Sparkle (Muted Gold) -->
+    <path
+        android:fillColor="#C49A45"
+        android:pathData="M78,16 C78,20 80,22 84,22 C80,22 78,24 78,28 C78,24 76,22 72,22 C76,22 78,20 78,16 Z" />
+</vector>

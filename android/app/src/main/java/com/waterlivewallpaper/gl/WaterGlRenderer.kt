@@ -45,6 +45,10 @@ class WaterGlRenderer(
     private var fboWidth = 0
     private var fboHeight = 0
 
+    // Custom background texture
+    private var bgTextureId = 0
+    private var currentBgPath: String? = null
+
     // Fullscreen quad buffer [-1,-1, 1,-1, -1,1, 1,1]
     private val quadBuffer: FloatBuffer = ByteBuffer.allocateDirect(4 * 2 * 4)
         .order(ByteOrder.nativeOrder())
@@ -140,6 +144,8 @@ class WaterGlRenderer(
         }
 
         deleteFbo()
+        deleteBgTexture()
+        currentBgPath = null
         shaderProgram.release()
         releaseEgl()
     }
@@ -198,6 +204,63 @@ class WaterGlRenderer(
         }
     }
 
+    private fun updateBackgroundTexture() {
+        val path = preferences.getCustomImagePath()
+        if (path == currentBgPath && bgTextureId != 0) return
+        if (path == null && bgTextureId == 0) return
+
+        deleteBgTexture()
+        currentBgPath = path
+
+        if (path != null) {
+            val file = java.io.File(path)
+            if (file.exists() && file.length() > 0) {
+                try {
+                    val boundsOpt = android.graphics.BitmapFactory.Options().apply { inJustDecodeBounds = true }
+                    android.graphics.BitmapFactory.decodeFile(path, boundsOpt)
+
+                    val reqW = if (width > 0) width else 1080
+                    val reqH = if (height > 0) height else 1920
+                    var inSample = 1
+                    while ((boundsOpt.outWidth / (inSample * 2)) >= reqW && (boundsOpt.outHeight / (inSample * 2)) >= reqH) {
+                        inSample *= 2
+                    }
+
+                    val decodeOpt = android.graphics.BitmapFactory.Options().apply {
+                        inSampleSize = inSample
+                        inPreferredConfig = android.graphics.Bitmap.Config.ARGB_8888
+                    }
+                    val bitmap = android.graphics.BitmapFactory.decodeFile(path, decodeOpt)
+                    if (bitmap != null) {
+                        val textures = IntArray(1)
+                        GLES20.glGenTextures(1, textures, 0)
+                        bgTextureId = textures[0]
+
+                        GLES20.glBindTexture(GLES20.GL_TEXTURE_2D, bgTextureId)
+                        GLES20.glTexParameteri(GLES20.GL_TEXTURE_2D, GLES20.GL_TEXTURE_MIN_FILTER, GLES20.GL_LINEAR)
+                        GLES20.glTexParameteri(GLES20.GL_TEXTURE_2D, GLES20.GL_TEXTURE_MAG_FILTER, GLES20.GL_LINEAR)
+                        GLES20.glTexParameteri(GLES20.GL_TEXTURE_2D, GLES20.GL_TEXTURE_WRAP_S, GLES20.GL_CLAMP_TO_EDGE)
+                        GLES20.glTexParameteri(GLES20.GL_TEXTURE_2D, GLES20.GL_TEXTURE_WRAP_T, GLES20.GL_CLAMP_TO_EDGE)
+                        android.opengl.GLUtils.texImage2D(GLES20.GL_TEXTURE_2D, 0, bitmap, 0)
+                        bitmap.recycle()
+                    }
+                } catch (e: Exception) {
+                    Log.w(TAG, "Failed to load custom background texture: " + e.message)
+                    deleteBgTexture()
+                    currentBgPath = null
+                }
+            }
+        }
+    }
+
+    private fun deleteBgTexture() {
+        if (bgTextureId != 0) {
+            val textures = intArrayOf(bgTextureId)
+            GLES20.glDeleteTextures(1, textures, 0)
+            bgTextureId = 0
+        }
+    }
+
     private fun renderFrame() {
         if (fboId == 0) {
             initFbo(width, height)
@@ -248,6 +311,17 @@ class WaterGlRenderer(
         GLES20.glActiveTexture(GLES20.GL_TEXTURE0)
         GLES20.glBindTexture(GLES20.GL_TEXTURE_2D, fboTextureId)
         GLES20.glUniform1i(shaderProgram.uIsoDensityTextureLoc, 0)
+
+        // Custom Background Image support
+        updateBackgroundTexture()
+        if (bgTextureId != 0) {
+            GLES20.glActiveTexture(GLES20.GL_TEXTURE1)
+            GLES20.glBindTexture(GLES20.GL_TEXTURE_2D, bgTextureId)
+            GLES20.glUniform1i(shaderProgram.uIsoBackgroundTextureLoc, 1)
+            GLES20.glUniform1i(shaderProgram.uIsoHasCustomBgLoc, 1)
+        } else {
+            GLES20.glUniform1i(shaderProgram.uIsoHasCustomBgLoc, 0)
+        }
 
         // Colors
         val waterColorInt = preferences.getWaterColor()

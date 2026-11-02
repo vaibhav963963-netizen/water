@@ -1,6 +1,7 @@
 import React, { useEffect, useRef, useState } from 'react';
 import {
   View,
+  Image,
   StyleSheet,
   PanResponder,
   GestureResponderEvent,
@@ -207,6 +208,13 @@ export const WaterSimulationView: React.FC<WaterSimulationViewProps> = ({
       onLayout={handleLayout}
       {...(enableInteractiveTouch ? panResponder.panHandlers : {})}
     >
+      {settings.backgroundImageUri ? (
+        <Image
+          source={{ uri: settings.backgroundImageUri }}
+          style={StyleSheet.absoluteFill}
+          resizeMode="cover"
+        />
+      ) : null}
       {/* If native GL view is active on Android build, render it */}
       {NativeWaterPreviewView && WallpaperBridge.isNativeModuleAvailable() ? (
         <NativeWaterPreviewView

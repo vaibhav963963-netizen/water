@@ -3,6 +3,30 @@ plugins {
     id("org.jetbrains.kotlin.android")
 }
 
+// Automatic Version Resolver:
+// Priority: 1. CLI -PversionCode / -PversionName -> 2. build-version.properties -> 3. Default fallback (1 / "1.0.0")
+def resolvedVersionCode = 1
+def resolvedVersionName = "1.0.0"
+
+def buildVersionFile = file('build-version.properties')
+if (buildVersionFile.exists()) {
+    def versionProps = new Properties()
+    buildVersionFile.withInputStream { versionProps.load(it) }
+    if (versionProps.containsKey('versionCode')) {
+        resolvedVersionCode = versionProps.getProperty('versionCode').toInteger()
+    }
+    if (versionProps.containsKey('versionName')) {
+        resolvedVersionName = versionProps.getProperty('versionName')
+    }
+}
+
+if (project.hasProperty('versionCode')) {
+    resolvedVersionCode = project.property('versionCode').toInteger()
+}
+if (project.hasProperty('versionName')) {
+    resolvedVersionName = project.property('versionName').toString()
+}
+
 android {
     namespace = "com.waterlivewallpaper"
     compileSdk = 35
@@ -11,8 +35,8 @@ android {
         applicationId = "com.waterlivewallpaper"
         minSdk = 24
         targetSdk = 35
-        versionCode = 1
-        versionName = "1.0.0"
+        versionCode = resolvedVersionCode
+        versionName = resolvedVersionName
 
         testInstrumentationRunner = "androidx.test.runner.AndroidJUnitRunner"
     }

@@ -1,0 +1,77 @@
+<?xml version="1.0" encoding="utf-8"?>
+<vector xmlns:android="http://schemas.android.com/apk/res/android"
+    android:width="96dp"
+    android:height="96dp"
+    android:viewportWidth="96"
+    android:viewportHeight="96">
+
+    <!-- Soft Drop Shadow -->
+    <path
+        android:fillColor="#26292421"
+        android:pathData="M24,84 C38,84 58,84 72,84 C78,84 82,86 82,88 C82,90 78,92 72,92 C58,92 38,92 24,92 C18,92 14,90 14,88 C14,86 18,84 24,84 Z" />
+
+    <!-- Left Alarm Bell (Champagne Gold) -->
+    <path
+        android:fillColor="#E5CD91"
+        android:pathData="M22,18 C26,14 34,18 36,22 L26,32 C22,30 18,22 22,18 Z" />
+
+    <!-- Right Alarm Bell (Champagne Gold) -->
+    <path
+        android:fillColor="#E5CD91"
+        android:pathData="M74,18 C70,14 62,18 60,22 L70,32 C74,30 78,22 74,18 Z" />
+
+    <!-- Center Hammer (Charcoal) -->
+    <path
+        android:fillColor="#292421"
+        android:pathData="M46,14 L50,14 L50,22 L46,22 Z" />
+
+    <!-- Feet (Champagne Gold) -->
+    <path
+        android:fillColor="#C49A45"
+        android:pathData="M28,76 L22,86 L30,86 L34,78 Z" />
+    <path
+        android:fillColor="#C49A45"
+        android:pathData="M68,76 L74,86 L66,86 L62,78 Z" />
+
+    <!-- Clock Outer Rim (Milano Red) -->
+    <path
+        android:fillColor="#A90E02"
+        android:pathData="M48,22 A30,30 0 1,0 48,82 A30,30 0 1,0 48,22 Z" />
+
+    <!-- Clock Inner Bevel (Milano Red Dark) -->
+    <path
+        android:fillColor="#800A01"
+        android:pathData="M48,25 A27,27 0 1,0 48,79 A27,27 0 1,0 48,25 Z" />
+
+    <!-- Clock Face (Lemon Chiffon) -->
+    <path
+        android:fillColor="#FFFBD4"
+        android:pathData="M48,28 A24,24 0 1,0 48,76 A24,24 0 1,0 48,28 Z" />
+
+    <!-- Hour Marks (Muted Gold) -->
+    <path
+        android:fillColor="#C49A45"
+        android:pathData="M47,31 L49,31 L49,35 L47,35 Z" />
+    <path
+        android:fillColor="#C49A45"
+        android:pathData="M47,69 L49,69 L49,73 L47,73 Z" />
+    <path
+        android:fillColor="#C49A45"
+        android:pathData="M29,51 L33,51 L33,53 L29,53 Z" />
+    <path
+        android:fillColor="#C49A45"
+        android:pathData="M63,51 L67,51 L67,53 L63,53 Z" />
+
+    <!-- Clock Hands (Charcoal) -->
+    <path
+        android:fillColor="#292421"
+        android:pathData="M47,38 L49,38 L49,52 L47,52 Z" />
+    <path
+        android:fillColor="#292421"
+        android:pathData="M48,50 L58,55 L57,57 L47,52 Z" />
+
+    <!-- Center Pivot (Milano Red) -->
+    <path
+        android:fillColor="#A90E02"
+        android:pathData="M48,50 A3,3 0 1,0 48,54 A3,3 0 1,0 48,50 Z" />
+</vector>

@@ -1,0 +1,68 @@
+<?xml version="1.0" encoding="utf-8"?>
+<vector xmlns:android="http://schemas.android.com/apk/res/android"
+    android:width="96dp"
+    android:height="96dp"
+    android:viewportWidth="96"
+    android:viewportHeight="96">
+
+    <!-- Soft Ambient Drop Shadow -->
+    <path
+        android:fillColor="#26292421"
+        android:pathData="M24,84 C38,84 58,84 72,84 C78,84 82,86 82,88 C82,90 78,92 72,92 C58,92 38,92 24,92 C18,92 14,90 14,88 C14,86 18,84 24,84 Z" />
+
+    <!-- 3D Water Droplet Outer Body (Milano Red) -->
+    <path
+        android:fillColor="#A90E02"
+        android:pathData="M48,10 C48,10 20,44 20,62 C20,77.5 32.5,90 48,90 C63.5,90 76,77.5 76,62 C76,44 48,10 48,10 Z" />
+
+    <!-- Deep Red Base Shadow for 3D Volume -->
+    <path
+        android:fillColor="#800A01"
+        android:pathData="M22,65 C23,78 34,88 48,88 C62,88 73,78 74,65 C74,72 63,82 48,82 C33,82 22,72 22,65 Z" />
+
+    <!-- Warm Highlight Crest (Bright Milano Red) -->
+    <path
+        android:fillColor="#C81D0F"
+        android:pathData="M48,14 C48,14 24,46 24,62 C24,70 28,76 34,80 C30,76 27,68 27,62 C27,47 48,18 48,14 Z" />
+
+    <!-- Glossy Lemon Chiffon Highlight Curve -->
+    <path
+        android:fillColor="#80FFFBD4"
+        android:pathData="M34,30 C30,38 27,48 27,58 C27,60 25,60 25,58 C25,47 28,36 33,28 C34,26 35,28 34,30 Z" />
+
+    <!-- Specular Highlight Dot (Lemon Chiffon) -->
+    <path
+        android:fillColor="#FFFBD4"
+        android:pathData="M40,24 A4,4 0 1,0 48,24 A4,4 0 1,0 40,24 Z" />
+
+    <!-- Cute Left Cartoon Eye (Deep Charcoal) -->
+    <path
+        android:fillColor="#171311"
+        android:pathData="M38,55 A4.5,5.5 0 1,0 47,55 A4.5,5.5 0 1,0 38,55 Z" />
+    <!-- Left Eye Sparkle (Lemon Chiffon) -->
+    <path
+        android:fillColor="#FFFBD4"
+        android:pathData="M40,53 A1.8,1.8 0 1,0 43.6,53 A1.8,1.8 0 1,0 40,53 Z" />
+
+    <!-- Cute Right Cartoon Eye (Deep Charcoal) -->
+    <path
+        android:fillColor="#171311"
+        android:pathData="M52,55 A4.5,5.5 0 1,0 61,55 A4.5,5.5 0 1,0 52,55 Z" />
+    <!-- Right Eye Sparkle (Lemon Chiffon) -->
+    <path
+        android:fillColor="#FFFBD4"
+        android:pathData="M54,53 A1.8,1.8 0 1,0 57.6,53 A1.8,1.8 0 1,0 54,53 Z" />
+
+    <!-- Cute Smile -->
+    <path
+        android:fillColor="#171311"
+        android:pathData="M44,65 C46,69 52,69 54,65 C55,64 56,65 55,66 C53,71 45,71 43,66 C42,65 43,64 44,65 Z" />
+
+    <!-- Soft Golden Blush Cheeks -->
+    <path
+        android:fillColor="#4DE5CD91"
+        android:pathData="M31,61 A4,2.5 0 1,0 39,61 A4,2.5 0 1,0 31,61 Z" />
+    <path
+        android:fillColor="#4DE5CD91"
+        android:pathData="M59,61 A4,2.5 0 1,0 67,61 A4,2.5 0 1,0 59,61 Z" />
+</vector>

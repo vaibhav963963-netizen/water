@@ -1,0 +1,59 @@
+<?xml version="1.0" encoding="utf-8"?>
+<vector xmlns:android="http://schemas.android.com/apk/res/android"
+    android:width="96dp"
+    android:height="96dp"
+    android:viewportWidth="96"
+    android:viewportHeight="96">
+
+    <!-- Soft Drop Shadow -->
+    <path
+        android:fillColor="#26292421"
+        android:pathData="M18,82 C34,82 62,82 78,82 C84,82 88,84 88,86 C88,88 84,90 78,90 C62,90 34,90 18,90 C12,90 8,88 8,86 C8,84 12,82 18,82 Z" />
+
+    <!-- Back Page Stack (Warm White) -->
+    <path
+        android:fillColor="#FFFEF7"
+        android:pathData="M24,24 L76,20 C78,20 80,22 80,24 L80,78 C80,80 78,82 76,82 L24,84 Z" />
+
+    <!-- Front Cover (Lemon Chiffon with Warm Cream Depth) -->
+    <path
+        android:fillColor="#FFFBD4"
+        android:pathData="M20,18 L72,14 C75,14 78,16 78,20 L78,76 C78,80 75,82 72,82 L20,80 C18,80 16,78 16,76 L16,22 C16,20 18,18 20,18 Z" />
+
+    <!-- Notebook Spine (Milano Red) -->
+    <path
+        android:fillColor="#A90E02"
+        android:pathData="M16,18 L24,18 L24,80 L16,80 Z" />
+
+    <!-- Milano Red Bookmark Ribbon -->
+    <path
+        android:fillColor="#A90E02"
+        android:pathData="M48,16 L56,16 L56,44 L52,40 L48,44 Z" />
+
+    <!-- Cover Inner Badge (Soft Cream) -->
+    <path
+        android:fillColor="#F5EDCC"
+        android:pathData="M32,32 L66,32 C68,32 70,34 70,36 L70,58 C70,60 68,62 66,62 L32,62 C30,62 28,60 28,58 L28,36 C28,34 30,32 32,32 Z" />
+
+    <!-- Golden Star Emblem on Cover (Champagne Gold) -->
+    <path
+        android:fillColor="#C49A45"
+        android:pathData="M49,38 L51,43 L56,44 L52,47 L53,52 L49,49 L45,52 L46,47 L42,44 L47,43 Z" />
+
+    <!-- Cute 3D Cartoon Pencil beside Notebook -->
+    <path
+        android:fillColor="#A90E02"
+        android:pathData="M78,40 L84,36 L88,40 L82,44 Z" />
+    <path
+        android:fillColor="#C81D0F"
+        android:pathData="M74,48 L80,44 L84,48 L78,52 Z" />
+    <path
+        android:fillColor="#FFFBD4"
+        android:pathData="M84,36 L86,34 C87,33 89,33 90,34 L91,35 C92,36 92,38 91,39 L88,40 Z" />
+    <path
+        android:fillColor="#F5EDCC"
+        android:pathData="M70,56 L74,48 L78,52 L70,56 Z" />
+    <path
+        android:fillColor="#171311"
+        android:pathData="M70,56 L72,52 L74,54 Z" />
+</vector>

@@ -1,0 +1,65 @@
+<?xml version="1.0" encoding="utf-8"?>
+<vector xmlns:android="http://schemas.android.com/apk/res/android"
+    android:width="96dp"
+    android:height="96dp"
+    android:viewportWidth="96"
+    android:viewportHeight="96">
+
+    <!-- Soft Drop Shadow -->
+    <path
+        android:fillColor="#26292421"
+        android:pathData="M16,84 C32,84 64,84 80,84 C86,84 90,86 90,88 C90,90 86,92 80,92 C64,92 32,92 16,92 C10,92 6,90 6,88 C6,86 10,84 16,84 Z" />
+
+    <!-- Camera Top Bar / Flash Turret (Milano Red) -->
+    <path
+        android:fillColor="#A90E02"
+        android:pathData="M32,24 L48,24 C50,24 52,26 53,28 L55,32 L27,32 L29,28 C30,26 31,24 32,24 Z" />
+
+    <!-- Cute Flash Bulb (Lemon Chiffon) -->
+    <path
+        android:fillColor="#FFFBD4"
+        android:pathData="M34,26 A3,3 0 1,0 40,26 A3,3 0 1,0 34,26 Z" />
+
+    <!-- Shutter Button (Milano Red Light) -->
+    <path
+        android:fillColor="#C81D0F"
+        android:pathData="M66,26 L74,26 C75,26 76,27 76,28 L76,32 L64,32 L64,28 C64,27 65,26 66,26 Z" />
+
+    <!-- Camera Main Body (Soft Cream / Warm White 3D) -->
+    <path
+        android:fillColor="#FFFEF7"
+        android:pathData="M20,32 L76,32 C82,32 86,36 86,42 L86,74 C86,80 82,84 76,84 L20,84 C14,84 10,80 10,74 L10,42 C10,36 14,32 20,32 Z" />
+
+    <!-- Top Body Accent Band (Milano Red) -->
+    <path
+        android:fillColor="#A90E02"
+        android:pathData="M10,42 L86,42 L86,46 L10,46 Z" />
+
+    <!-- Big Lens Outer Rim (Charcoal) -->
+    <path
+        android:fillColor="#292421"
+        android:pathData="M48,38 A20,20 0 1,0 48,78 A20,20 0 1,0 48,38 Z" />
+
+    <!-- Lens Glass Reflection Ring (Champagne Gold) -->
+    <path
+        android:fillColor="#E5CD91"
+        android:pathData="M48,42 A16,16 0 1,0 48,74 A16,16 0 1,0 48,42 Z" />
+
+    <!-- Deep Lens Pupil (Deep Black) -->
+    <path
+        android:fillColor="#171311"
+        android:pathData="M48,46 A12,12 0 1,0 48,70 A12,12 0 1,0 48,46 Z" />
+
+    <!-- Glossy Specular Light Reflection (Lemon Chiffon) -->
+    <path
+        android:fillColor="#FFFBD4"
+        android:pathData="M42,50 A4,4 0 1,0 50,50 A4,4 0 1,0 42,50 Z" />
+    <path
+        android:fillColor="#FFFBD4"
+        android:pathData="M52,60 A2,2 0 1,0 56,60 A2,2 0 1,0 52,60 Z" />
+
+    <!-- Floating Sparkle (Champagne Gold) -->
+    <path
+        android:fillColor="#C49A45"
+        android:pathData="M80,18 C80,24 82,26 86,26 C82,26 80,28 80,34 C80,28 78,26 74,26 C78,26 80,24 80,18 Z" />
+</vector>

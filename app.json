@@ -36,6 +36,15 @@
     "plugins": [
       "expo-router"
     ],
-    "scheme": "waterwallpaper"
+    "scheme": "waterwallpaper",
+    "extra": {
+      "router": {
+        "origin": false
+      },
+      "eas": {
+        "projectId": "c4b5deef-6628-43bc-ad5e-49fe2a52d8b8"
+      }
+    },
+    "owner": "vaibhav999666333"
   }
 }

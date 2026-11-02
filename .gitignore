@@ -1,4 +1,4 @@
-﻿node_modules/
+node_modules/
 **/node_modules/
 dist/
 build/
@@ -10,3 +10,8 @@ npm-debug.log*
 .DS_Store
 Thumbs.db
 .vscode/
+android/app/build-version.properties
+version.json
+android/app/build/
+.gradle/
+android/.gradle/

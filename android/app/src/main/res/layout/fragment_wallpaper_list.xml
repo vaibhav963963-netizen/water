@@ -1,0 +1,152 @@
+<?xml version="1.0" encoding="utf-8"?>
+<ScrollView xmlns:android="http://schemas.android.com/apk/res/android"
+    android:id="@+id/scrollWallpaperList"
+    android:layout_width="match_parent"
+    android:layout_height="match_parent"
+    android:fillViewport="true"
+    android:scrollbars="none"
+    android:background="@color/bg_canvas">
+
+    <LinearLayout
+        android:layout_width="match_parent"
+        android:layout_height="wrap_content"
+        android:orientation="vertical"
+        android:paddingStart="22dp"
+        android:paddingEnd="22dp"
+        android:paddingTop="50dp"
+        android:paddingBottom="100dp">
+
+        <!-- Header: Back Button, Title, Subtitle -->
+        <LinearLayout
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:orientation="horizontal"
+            android:gravity="center_vertical"
+            android:layout_marginBottom="28dp">
+
+            <ImageView
+                android:id="@+id/btnWallpaperListBack"
+                android:layout_width="42dp"
+                android:layout_height="42dp"
+                android:background="@drawable/btn_icon_circle"
+                android:src="@drawable/ic_back_arrow"
+                android:padding="11dp"
+                android:layout_marginEnd="14dp"
+                android:contentDescription="Back to Home" />
+
+            <LinearLayout
+                android:layout_width="0dp"
+                android:layout_height="wrap_content"
+                android:layout_weight="1"
+                android:orientation="vertical">
+
+                <TextView
+                    android:layout_width="wrap_content"
+                    android:layout_height="wrap_content"
+                    android:text="Wallpapers"
+                    android:textSize="24sp"
+                    android:textStyle="bold"
+                    android:textColor="@color/text_display" />
+
+                <TextView
+                    android:layout_width="wrap_content"
+                    android:layout_height="wrap_content"
+                    android:text="Choose your live wallpaper"
+                    android:textSize="13sp"
+                    android:textColor="@color/text_secondary"
+                    android:layout_marginTop="1dp" />
+            </LinearLayout>
+        </LinearLayout>
+
+        <!-- Catalog Section Header -->
+        <TextView
+            android:layout_width="wrap_content"
+            android:layout_height="wrap_content"
+            android:text="AVAILABLE WALLPAPERS"
+            android:textSize="12sp"
+            android:textStyle="bold"
+            android:textColor="@color/brand_warm_grey"
+            android:letterSpacing="0.08"
+            android:layout_marginBottom="14dp" />
+
+        <!-- Data-Driven Item 1: Liquid Fluid Wallpaper -->
+        <LinearLayout
+            android:id="@+id/cardWallpaperCatalogItem"
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:orientation="vertical"
+            android:background="@drawable/card_clean_white"
+            android:padding="18dp"
+            android:clickable="true"
+            android:focusable="true"
+            android:layout_marginBottom="16dp">
+
+            <!-- Wallpaper Large Preview Artwork -->
+            <FrameLayout
+                android:layout_width="match_parent"
+                android:layout_height="160dp"
+                android:background="@drawable/wallpaper_thumb"
+                android:layout_marginBottom="16dp">
+
+                <TextView
+                    android:layout_width="wrap_content"
+                    android:layout_height="wrap_content"
+                    android:text="LIVE OPENGL"
+                    android:textSize="9sp"
+                    android:textStyle="bold"
+                    android:textColor="@color/brand_milano_red"
+                    android:background="@drawable/pill_badge_cream"
+                    android:paddingStart="8dp"
+                    android:paddingEnd="8dp"
+                    android:paddingTop="3dp"
+                    android:paddingBottom="3dp"
+                    android:layout_gravity="top|start"
+                    android:layout_margin="12dp" />
+            </FrameLayout>
+
+            <LinearLayout
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:orientation="horizontal"
+                android:gravity="center_vertical">
+
+                <LinearLayout
+                    android:layout_width="0dp"
+                    android:layout_height="wrap_content"
+                    android:layout_weight="1"
+                    android:orientation="vertical">
+
+                    <TextView
+                        android:layout_width="wrap_content"
+                        android:layout_height="wrap_content"
+                        android:text="Liquid Fluid Wallpaper"
+                        android:textSize="17sp"
+                        android:textStyle="bold"
+                        android:textColor="@color/text_display" />
+
+                    <TextView
+                        android:layout_width="wrap_content"
+                        android:layout_height="wrap_content"
+                        android:text="Real-time physics fluid responding to phone tilt &amp; touch"
+                        android:textSize="12sp"
+                        android:textColor="@color/text_secondary"
+                        android:layout_marginTop="2dp" />
+                </LinearLayout>
+
+                <Button
+                    android:id="@+id/btnViewWallpaper"
+                    android:layout_width="wrap_content"
+                    android:layout_height="40dp"
+                    android:text="View →"
+                    android:textSize="12sp"
+                    android:textStyle="bold"
+                    android:textColor="@color/brand_lemon_chiffon"
+                    android:background="@drawable/btn_primary_red"
+                    android:paddingStart="16dp"
+                    android:paddingEnd="16dp"
+                    android:layout_marginStart="10dp" />
+            </LinearLayout>
+        </LinearLayout>
+
+    </LinearLayout>
+</ScrollView>
