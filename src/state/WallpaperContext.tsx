@@ -4,8 +4,8 @@ import {
   DeviceCompatibility,
   PresetTheme,
   WallpaperSettings,
-} from '../types/wallpaper';
-import { WallpaperBridge } from '../services/WallpaperBridge';
+} from '../features/wallpapers/base/wallpaper';
+import { WallpaperBridge } from '../core/services/WallpaperBridge';
 
 interface WallpaperContextValue {
   settings: WallpaperSettings;

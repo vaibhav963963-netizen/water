@@ -7,29 +7,42 @@ import {
   SafeAreaView,
   StatusBar,
 } from 'react-native';
-import { useRouter } from 'expo-router';
+import { useRouter, useLocalSearchParams } from 'expo-router';
 import { useWallpaper } from '../src/state/WallpaperContext';
-import { useToast } from '../src/components/Toast';
-import { WaterSimulationView } from '../src/components/WaterSimulationView';
-import { Colors } from '../src/theme/colors';
+import { useToast } from '../src/core/components/Toast';
+import { WaterSimulationView } from '../src/features/wallpapers/water/WaterSimulationView';
+import { SticksSimulationView } from '../src/features/wallpapers/sticks/SticksSimulationView';
+import { Colors } from '../src/core/theme/colors';
 
 export default function PreviewScreen() {
   const router = useRouter();
+  const { type } = useLocalSearchParams<{ type?: string }>();
+  const isSticks = type === 'sticks';
   const { settings, openWallpaperChooser } = useWallpaper();
   const { showToast } = useToast();
-  const [stats, setStats] = useState({ fps: 60, particles: 200, droplets: 0 });
+  const [stats, setStats] = useState({ fps: 60, particles: isSticks ? 5 : 200, droplets: 0 });
   const [showHud, setShowHud] = useState(true);
 
   return (
     <View style={styles.container}>
       <StatusBar hidden />
-      <WaterSimulationView
-        settings={settings}
-        enableInteractiveTouch={true}
-        enableSensors={true}
-        onStatsUpdate={setStats}
-        style={StyleSheet.absoluteFill}
-      />
+      {isSticks ? (
+        <SticksSimulationView
+          settings={settings}
+          enableInteractiveTouch={true}
+          enableSensors={true}
+          onStatsUpdate={(s) => setStats({ fps: s.fps, particles: s.sticks, droplets: s.kineticEnergy })}
+          style={StyleSheet.absoluteFill}
+        />
+      ) : (
+        <WaterSimulationView
+          settings={settings}
+          enableInteractiveTouch={true}
+          enableSensors={true}
+          onStatsUpdate={setStats}
+          style={StyleSheet.absoluteFill}
+        />
+      )}
 
       {/* Floating HUD & Controls Overlay */}
       <SafeAreaView style={styles.overlayContainer} pointerEvents="box-none">
@@ -64,12 +77,12 @@ export default function PreviewScreen() {
               <View style={styles.statDivider} />
               <View style={styles.statItem}>
                 <Text style={styles.statValue}>{stats.particles}</Text>
-                <Text style={styles.statLabel}>PARTICLES</Text>
+                <Text style={styles.statLabel}>{isSticks ? 'STICKS' : 'PARTICLES'}</Text>
               </View>
               <View style={styles.statDivider} />
               <View style={styles.statItem}>
                 <Text style={styles.statValue}>{stats.droplets}</Text>
-                <Text style={styles.statLabel}>SPLASHES</Text>
+                <Text style={styles.statLabel}>{isSticks ? 'ENERGY' : 'SPLASHES'}</Text>
               </View>
             </View>
           </View>
@@ -80,8 +93,14 @@ export default function PreviewScreen() {
           <View style={styles.bottomFloatingCard}>
             <View style={styles.bottomMetaRow}>
               <View>
-                <Text style={styles.bottomCardTitle}>Liquid Fluid Wallpaper</Text>
-                <Text style={styles.bottomCardSub}>Tilt to slosh • Tap to ripple</Text>
+                <Text style={styles.bottomCardTitle}>
+                  {isSticks ? 'Floating Sticks Wallpaper' : 'Liquid Fluid Wallpaper'}
+                </Text>
+                <Text style={styles.bottomCardSub}>
+                  {isSticks
+                    ? 'Tilt to drift & roll • Shake to fling • 3D driftwood'
+                    : 'Tilt to slosh • Tap to ripple'}
+                </Text>
               </View>
               <View style={styles.badgeActive}>
                 <Text style={styles.badgeActiveText}>LIVE</Text>

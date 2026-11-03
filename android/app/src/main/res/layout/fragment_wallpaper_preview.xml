@@ -5,10 +5,17 @@
     android:background="@color/brand_charcoal">
 
     <!-- Real OpenGL Fluid Simulation Surface -->
-    <com.waterlivewallpaper.view.WaterSurfaceView
+    <com.waterlivewallpaper.features.wallpapers.water.ui.WaterSurfaceView
         android:id="@+id/waterSurfaceView"
         android:layout_width="match_parent"
         android:layout_height="match_parent" />
+
+    <!-- Real OpenGL Floating Sticks Surface -->
+    <com.waterlivewallpaper.features.wallpapers.sticks.ui.SticksSurfaceView
+        android:id="@+id/sticksSurfaceView"
+        android:layout_width="match_parent"
+        android:layout_height="match_parent"
+        android:visibility="gone" />
 
     <!-- Top Minimal HUD -->
     <LinearLayout
@@ -32,6 +39,7 @@
             android:contentDescription="Back" />
 
         <TextView
+            android:id="@+id/txtPreviewTopTitle"
             android:layout_width="0dp"
             android:layout_height="wrap_content"
             android:layout_weight="1"
@@ -66,6 +74,7 @@
         android:layout_marginBottom="28dp">
 
         <TextView
+            android:id="@+id/txtPreviewBottomTitle"
             android:layout_width="wrap_content"
             android:layout_height="wrap_content"
             android:text="Liquid Fluid Wallpaper"
@@ -74,6 +83,7 @@
             android:textColor="@color/brand_lemon_chiffon" />
 
         <TextView
+            android:id="@+id/txtPreviewBottomSubtitle"
             android:layout_width="wrap_content"
             android:layout_height="wrap_content"
             android:text="Tilt phone to slosh liquid • Shake for splashes • Tap to ripple"

@@ -8,11 +8,12 @@ import {
   SafeAreaView,
   Platform,
   Dimensions,
+  Image,
 } from 'react-native';
 import { useRouter } from 'expo-router';
 import { useWallpaper } from '../src/state/WallpaperContext';
-import { useToast } from '../src/components/Toast';
-import { Colors } from '../src/theme/colors';
+import { useToast } from '../src/core/components/Toast';
+import { Colors } from '../src/core/theme/colors';
 import {
   WaterDrop3D,
   Notebook3D,
@@ -20,7 +21,7 @@ import {
   Folder3D,
   Toolbox3D,
   Clock3D,
-} from '../src/components/Stickers3D';
+} from '../src/features/dashboard/Stickers3D';
 
 type ActiveScreen = 'home' | 'wallpapers' | 'coming_soon' | 'settings';
 
@@ -354,6 +355,68 @@ export default function AppEntry() {
         </View>
       </View>
 
+      {/* 2. Floating Sticks Live Wallpaper */}
+      <View style={[styles.wallpaperEntryCard, { marginTop: 18 }]}>
+        {/* Card Header with Status */}
+        <View style={styles.wallpaperCardHeader}>
+          <View style={[styles.badgeActive, { backgroundColor: '#FBF8E6', borderColor: '#C49A45' }]}>
+            <Text style={[styles.badgeActiveText, { color: '#88502B' }]}>NEW • 3D RIGID BODY</Text>
+          </View>
+          <Text style={styles.wallpaperTechLabel}>OpenGL ES • 60-120 FPS</Text>
+        </View>
+
+        {/* Visual Banner Preview */}
+        <View style={styles.wallpaperBanner}>
+          <View style={[styles.bannerArtCircle, { backgroundColor: '#F4ECE1' }]}>
+            <Image
+              source={require('../assets/stickers/stick_twig_1.png')}
+              style={{ width: 72, height: 28, transform: [{ rotate: '-10deg' }] }}
+              resizeMode="contain"
+            />
+          </View>
+          <View style={styles.bannerMeta}>
+            <Text style={styles.bannerTitle}>Floating Sticks Wallpaper</Text>
+            <Text style={styles.bannerSubtitle}>3D Driftwood Twigs &amp; Inertial Physics</Text>
+          </View>
+        </View>
+
+        {/* Feature Highlights */}
+        <Text style={styles.wallpaperDescription}>
+          Photorealistic 3D wooden driftwood twigs floating on canvas, reacting to gravity tilt, touch disturbance ripples, rotational torque, and real-time rigid-body collisions.
+        </Text>
+
+        <View style={styles.featurePillRow}>
+          <View style={styles.featurePill}>
+            <Text style={styles.featurePillText}>✓ Gyroscope Tilt</Text>
+          </View>
+          <View style={styles.featurePill}>
+            <Text style={styles.featurePillText}>✓ Touch Ripples</Text>
+          </View>
+          <View style={styles.featurePill}>
+            <Text style={styles.featurePillText}>✓ Stick Collisions</Text>
+          </View>
+        </View>
+
+        {/* Actions */}
+        <View style={styles.cardActionsRow}>
+          <TouchableOpacity
+            style={styles.btnSecondary}
+            onPress={() => router.push('/customize')}
+            activeOpacity={0.8}
+          >
+            <Text style={styles.btnSecondaryText}>Customize ⚙</Text>
+          </TouchableOpacity>
+
+          <TouchableOpacity
+            style={styles.btnPrimary}
+            onPress={() => router.push({ pathname: '/preview', params: { type: 'sticks' } })}
+            activeOpacity={0.85}
+          >
+            <Text style={styles.btnPrimaryText}>Open Live Preview →</Text>
+          </TouchableOpacity>
+        </View>
+      </View>
+
       <View style={{ height: 100 }} />
     </ScrollView>
   );
@@ -618,6 +681,7 @@ const styles = StyleSheet.create({
   scrollContent: {
     padding: 18,
     paddingTop: 10,
+    paddingBottom: 130,
   },
 
   /* Top Header */

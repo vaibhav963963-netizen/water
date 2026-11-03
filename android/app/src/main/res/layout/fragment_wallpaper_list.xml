@@ -148,5 +148,93 @@
             </LinearLayout>
         </LinearLayout>
 
+        <!-- Data-Driven Item 2: Floating Sticks Water Wallpaper -->
+        <LinearLayout
+            android:id="@+id/cardWallpaperSticksItem"
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:orientation="vertical"
+            android:background="@drawable/card_clean_white"
+            android:padding="18dp"
+            android:clickable="true"
+            android:focusable="true"
+            android:layout_marginBottom="16dp">
+
+            <!-- Stick Large Preview Artwork -->
+            <FrameLayout
+                android:layout_width="match_parent"
+                android:layout_height="160dp"
+                android:background="@drawable/wallpaper_thumb"
+                android:layout_marginBottom="16dp">
+
+                <ImageView
+                    android:layout_width="220dp"
+                    android:layout_height="70dp"
+                    android:src="@drawable/stick_twig_1"
+                    android:layout_gravity="center"
+                    android:scaleType="fitCenter"
+                    android:rotation="-8"
+                    android:contentDescription="Floating Stick" />
+
+                <TextView
+                    android:layout_width="wrap_content"
+                    android:layout_height="wrap_content"
+                    android:text="NEW • 3D RIGID BODY"
+                    android:textSize="9sp"
+                    android:textStyle="bold"
+                    android:textColor="@color/brand_milano_red"
+                    android:background="@drawable/pill_badge_cream"
+                    android:paddingStart="8dp"
+                    android:paddingEnd="8dp"
+                    android:paddingTop="3dp"
+                    android:paddingBottom="3dp"
+                    android:layout_gravity="top|start"
+                    android:layout_margin="12dp" />
+            </FrameLayout>
+
+            <LinearLayout
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:orientation="horizontal"
+                android:gravity="center_vertical">
+
+                <LinearLayout
+                    android:layout_width="0dp"
+                    android:layout_height="wrap_content"
+                    android:layout_weight="1"
+                    android:orientation="vertical">
+
+                    <TextView
+                        android:layout_width="wrap_content"
+                        android:layout_height="wrap_content"
+                        android:text="Floating Sticks Water"
+                        android:textSize="17sp"
+                        android:textStyle="bold"
+                        android:textColor="@color/text_display" />
+
+                    <TextView
+                        android:layout_width="wrap_content"
+                        android:layout_height="wrap_content"
+                        android:text="Water physics coupled with floating 3D wooden driftwood twigs &amp; buoyancy"
+                        android:textSize="12sp"
+                        android:textColor="@color/text_secondary"
+                        android:layout_marginTop="2dp" />
+                </LinearLayout>
+
+                <Button
+                    android:id="@+id/btnViewSticksWallpaper"
+                    android:layout_width="wrap_content"
+                    android:layout_height="40dp"
+                    android:text="View →"
+                    android:textSize="12sp"
+                    android:textStyle="bold"
+                    android:textColor="@color/brand_lemon_chiffon"
+                    android:background="@drawable/btn_primary_red"
+                    android:paddingStart="16dp"
+                    android:paddingEnd="16dp"
+                    android:layout_marginStart="10dp" />
+            </LinearLayout>
+        </LinearLayout>
+
     </LinearLayout>
 </ScrollView>

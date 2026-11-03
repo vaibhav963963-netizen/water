@@ -8,9 +8,9 @@ import {
 } from 'react-native';
 import { useRouter } from 'expo-router';
 import { useWallpaper } from '../src/state/WallpaperContext';
-import { useToast } from '../src/components/Toast';
-import { Colors } from '../src/theme/colors';
-import { QualityLevel } from '../src/types/wallpaper';
+import { useToast } from '../src/core/components/Toast';
+import { Colors } from '../src/core/theme/colors';
+import { QualityLevel } from '../src/features/wallpapers/base/wallpaper';
 
 export default function SettingsScreen() {
   const router = useRouter();
@@ -19,15 +19,14 @@ export default function SettingsScreen() {
   const [checkingUpdate, setCheckingUpdate] = useState(false);
 
   const handleSelectQuality = (level: QualityLevel) => {
-    let fps = 60;
-    let label = 'Balanced (60 FPS)';
-    if (level === 'low') {
-      fps = 30;
-      label = 'Battery Saver (30 FPS)';
-    }
-    if (level === 'high') {
-      fps = 120;
-      label = 'Ultra Smooth (120 FPS)';
+    let fps = 30;
+    let label = 'Balanced (30 FPS)';
+    if (level === 'low' || level === 'battery_saver') {
+      fps = 24;
+      label = 'Battery Saver (24 FPS)';
+    } else if (level === 'high' || level === 'performance') {
+      fps = 60;
+      label = 'Performance (60 FPS)';
     }
     updateSettings({ qualityLevel: level, targetFps: fps });
     showToast('Performance Mode Updated', label, '⚙', 'charcoal');
@@ -104,17 +103,21 @@ export default function SettingsScreen() {
         </Text>
 
         <View style={styles.qualityRow}>
-          {(['low', 'balanced', 'high'] as QualityLevel[]).map((level) => {
-            const isSelected = settings.qualityLevel === level;
-            const titles = {
+          {(['battery_saver', 'balanced', 'performance'] as QualityLevel[]).map((level) => {
+            const isSelected = settings.qualityLevel === level || (level === 'battery_saver' && settings.qualityLevel === 'low') || (level === 'performance' && settings.qualityLevel === 'high');
+            const titles: Record<QualityLevel, string> = {
               low: 'Battery Saver',
+              battery_saver: 'Battery Saver',
               balanced: 'Balanced',
-              high: 'Ultra Smooth',
+              high: 'Performance',
+              performance: 'Performance',
             };
-            const subs = {
-              low: '30 FPS',
-              balanced: '60 FPS',
-              high: '90-120 FPS',
+            const subs: Record<QualityLevel, string> = {
+              low: '24 FPS',
+              battery_saver: '24 FPS',
+              balanced: '30 FPS',
+              high: '60 FPS',
+              performance: '60 FPS',
             };
             return (
               <TouchableOpacity

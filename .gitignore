@@ -15,3 +15,4 @@ version.json
 android/app/build/
 .gradle/
 android/.gradle/
+scratch/

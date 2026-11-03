@@ -6,7 +6,7 @@
     android:background="@color/bg_canvas">
 
     <!-- Subtle Ambient Particle Accents in Background -->
-    <com.waterlivewallpaper.ui.FloatingParticlesView
+    <com.waterlivewallpaper.core.ui.FloatingParticlesView
         android:id="@+id/floatingParticlesView"
         android:layout_width="match_parent"
         android:layout_height="match_parent"

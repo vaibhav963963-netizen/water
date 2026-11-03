@@ -48,6 +48,20 @@
                 android:resource="@xml/wallpaper" />
         </service>
 
+        <!-- Android Live Wallpaper Service Engine - Floating Sticks Water -->
+        <service
+            android:name=".SticksWallpaperService"
+            android:label="@string/wallpaper_sticks_name"
+            android:permission="android.permission.BIND_WALLPAPER"
+            android:exported="true">
+            <intent-filter>
+                <action android:name="android.service.wallpaper.WallpaperService" />
+            </intent-filter>
+            <meta-data
+                android:name="android.service.wallpaper"
+                android:resource="@xml/wallpaper_sticks" />
+        </service>
+
         <!-- FileProvider for secure APK installation -->
         <provider
             android:name="androidx.core.content.FileProvider"

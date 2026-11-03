@@ -3,8 +3,8 @@ import { Stack } from 'expo-router';
 import { StatusBar } from 'expo-status-bar';
 import { SafeAreaProvider } from 'react-native-safe-area-context';
 import { WallpaperProvider } from '../src/state/WallpaperContext';
-import { ToastProvider } from '../src/components/Toast';
-import { Colors } from '../src/theme/colors';
+import { ToastProvider } from '../src/core/components/Toast';
+import { Colors } from '../src/core/theme/colors';
 
 export default function RootLayout() {
   return (

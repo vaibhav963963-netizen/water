@@ -12,10 +12,10 @@ import {
 import * as ImagePicker from 'expo-image-picker';
 import { useRouter } from 'expo-router';
 import { useWallpaper } from '../src/state/WallpaperContext';
-import { useToast } from '../src/components/Toast';
-import { SettingSlider } from '../src/components/SettingSlider';
-import { Colors } from '../src/theme/colors';
-import { BackgroundType } from '../src/types/wallpaper';
+import { useToast } from '../src/core/components/Toast';
+import { SettingSlider } from '../src/core/components/SettingSlider';
+import { Colors } from '../src/core/theme/colors';
+import { BackgroundType } from '../src/features/wallpapers/base/wallpaper';
 
 const COLOR_SWATCHES = [
   { name: 'Milano Red', hex: '#A90E02' },

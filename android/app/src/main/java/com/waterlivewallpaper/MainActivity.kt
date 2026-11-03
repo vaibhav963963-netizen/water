@@ -18,17 +18,18 @@ import androidx.appcompat.app.AppCompatActivity
 import androidx.core.content.ContextCompat
 import androidx.fragment.app.Fragment
 import androidx.fragment.app.FragmentManager
-import com.waterlivewallpaper.ui.AnimationUtils
-import com.waterlivewallpaper.ui.fragments.ComingSoonFragment
-import com.waterlivewallpaper.ui.fragments.HomeDashboardFragment
-import com.waterlivewallpaper.ui.fragments.SettingsFragment
-import com.waterlivewallpaper.ui.fragments.WallpaperCustomizeFragment
-import com.waterlivewallpaper.ui.fragments.WallpaperListFragment
-import com.waterlivewallpaper.ui.fragments.WallpaperPreviewFragment
-import com.waterlivewallpaper.updater.UpdateInfo
-import com.waterlivewallpaper.updater.UpdateInstaller
-import com.waterlivewallpaper.updater.UpdateManager
-import com.waterlivewallpaper.updater.UpdateState
+import com.waterlivewallpaper.core.ui.AnimationUtils
+import com.waterlivewallpaper.core.updater.UpdateInfo
+import com.waterlivewallpaper.core.updater.UpdateInstaller
+import com.waterlivewallpaper.core.updater.UpdateManager
+import com.waterlivewallpaper.core.updater.UpdateState
+import com.waterlivewallpaper.features.dashboard.ComingSoonFragment
+import com.waterlivewallpaper.features.dashboard.HomeDashboardFragment
+import com.waterlivewallpaper.features.settings.SettingsFragment
+import com.waterlivewallpaper.features.wallpapers.base.WallpaperRegistry
+import com.waterlivewallpaper.features.wallpapers.list.WallpaperListFragment
+import com.waterlivewallpaper.features.wallpapers.water.ui.WallpaperCustomizeFragment
+import com.waterlivewallpaper.features.wallpapers.water.ui.WallpaperPreviewFragment
 
 class MainActivity : AppCompatActivity() {
 
@@ -239,8 +240,16 @@ class MainActivity : AppCompatActivity() {
     fun navigateToWallpaperPreview() {
         supportFragmentManager.beginTransaction()
             .setCustomAnimations(android.R.anim.fade_in, android.R.anim.fade_out)
-            .replace(R.id.fragmentContainer, WallpaperPreviewFragment())
+            .replace(R.id.fragmentContainer, WallpaperPreviewFragment.newInstance(WallpaperRegistry.WALLPAPER_ID_WATER))
             .addToBackStack("WallpaperPreview")
+            .commit()
+    }
+
+    fun navigateToSticksPreview() {
+        supportFragmentManager.beginTransaction()
+            .setCustomAnimations(android.R.anim.fade_in, android.R.anim.fade_out)
+            .replace(R.id.fragmentContainer, WallpaperPreviewFragment.newInstance(WallpaperRegistry.WALLPAPER_ID_STICKS))
+            .addToBackStack("SticksPreview")
             .commit()
     }
 
@@ -274,6 +283,35 @@ class MainActivity : AppCompatActivity() {
     fun openWallpaperChooser() {
         try {
             val component = ComponentName(this, WaterWallpaperService::class.java)
+            val intent = Intent(WallpaperManager.ACTION_CHANGE_LIVE_WALLPAPER).apply {
+                putExtra(WallpaperManager.EXTRA_LIVE_WALLPAPER_COMPONENT, component)
+                addFlags(Intent.FLAG_ACTIVITY_NEW_TASK)
+            }
+            if (intent.resolveActivity(packageManager) != null) {
+                startActivity(intent)
+                return
+            }
+
+            val fallbackIntent = Intent(WallpaperManager.ACTION_LIVE_WALLPAPER_CHOOSER).apply {
+                addFlags(Intent.FLAG_ACTIVITY_NEW_TASK)
+            }
+            if (fallbackIntent.resolveActivity(packageManager) != null) {
+                startActivity(fallbackIntent)
+                return
+            }
+
+            val generalIntent = Intent(Intent.ACTION_SET_WALLPAPER).apply {
+                addFlags(Intent.FLAG_ACTIVITY_NEW_TASK)
+            }
+            startActivity(generalIntent)
+        } catch (e: Exception) {
+            Toast.makeText(this, "Could not open wallpaper settings: ${e.message}", Toast.LENGTH_LONG).show()
+        }
+    }
+
+    fun openSticksWallpaperChooser() {
+        try {
+            val component = ComponentName(this, SticksWallpaperService::class.java)
             val intent = Intent(WallpaperManager.ACTION_CHANGE_LIVE_WALLPAPER).apply {
                 putExtra(WallpaperManager.EXTRA_LIVE_WALLPAPER_COMPONENT, component)
                 addFlags(Intent.FLAG_ACTIVITY_NEW_TASK)

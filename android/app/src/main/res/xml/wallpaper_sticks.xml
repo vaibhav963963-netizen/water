@@ -1,0 +1,6 @@
+<?xml version="1.0" encoding="utf-8"?>
+<wallpaper xmlns:android="http://schemas.android.com/apk/res/android"
+    android:thumbnail="@drawable/stick_twig_1"
+    android:description="@string/wallpaper_sticks_description"
+    android:author="@string/wallpaper_author"
+    android:settingsActivity="com.waterlivewallpaper.MainActivity" />
