@@ -222,11 +222,11 @@ export class FluidEngine {
       }
 
       // Detachment of droplets under high velocity and low density
-      if (!pi.isDroplet && pi.density < this.params.restDensity * 0.40) {
+      if (!pi.isDroplet && pi.density < this.params.restDensity * 0.30) {
         const speed = Math.hypot(pi.vx, pi.vy);
-        if (speed > dropThreshold) {
+        if (speed > dropThreshold * 1.15) {
           pi.isDroplet = true;
-          pi.radius = this.params.particleRadius * (0.42 + Math.random() * 0.3);
+          pi.radius = this.params.particleRadius * (0.20 + Math.random() * 0.14);
           pi.lifetime = 0;
         }
       }

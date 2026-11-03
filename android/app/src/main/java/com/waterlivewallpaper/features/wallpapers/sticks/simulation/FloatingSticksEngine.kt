@@ -195,9 +195,9 @@ class FloatingSticksEngine(
                 s.vy *= linearDamping
 
                 if (state == StickSimulationState.SETTLING) {
-                    s.vx *= 0.88f
-                    s.vy *= 0.88f
-                    s.angularVelocity *= 0.85f
+                    s.vx *= 0.96f
+                    s.vy *= 0.96f
+                    s.angularVelocity *= 0.94f
                 }
 
                 s.x += s.vx * dt
@@ -234,9 +234,9 @@ class FloatingSticksEngine(
 
             // State Transitions
             if (state == StickSimulationState.ACTIVE) {
-                if (maxVelocityObserved < 150f && maxAngularVelocityObserved < 1.0f) {
+                if (maxVelocityObserved < 100f && maxAngularVelocityObserved < 0.6f) {
                     settlingDuration += dt
-                    if (settlingDuration > 0.20f) {
+                    if (settlingDuration > 0.35f) {
                         state = StickSimulationState.SETTLING
                         settlingDuration = 0f
                     }
@@ -244,12 +244,12 @@ class FloatingSticksEngine(
                     settlingDuration = 0f
                 }
             } else if (state == StickSimulationState.SETTLING) {
-                if (maxVelocityObserved > 250f) {
+                if (maxVelocityObserved > 180f || maxAngularVelocityObserved > 1.2f) {
                     state = StickSimulationState.ACTIVE
                     settlingDuration = 0f
                 } else {
                     settlingDuration += dt
-                    if (settlingDuration > 0.35f && fluidEngine.isAsleep) {
+                    if (settlingDuration > 0.60f && fluidEngine.isAsleep && maxVelocityObserved < 20f && maxAngularVelocityObserved < 0.2f) {
                         for (s in sticks) {
                             s.vx = 0f
                             s.vy = 0f
@@ -393,9 +393,20 @@ class FloatingSticksEngine(
                     val relVy = vBy - vAy
                     val normalVel = relVx * nx + relVy * ny
 
+                    // If settling or sleeping, only separate positions to maintain stacking without injecting kinetic energy
+                    if (state != StickSimulationState.ACTIVE) {
+                        a.vx *= 0.90f
+                        a.vy *= 0.90f
+                        b.vx *= 0.90f
+                        b.vy *= 0.90f
+                        a.angularVelocity *= 0.85f
+                        b.angularVelocity *= 0.85f
+                        continue
+                    }
+
                     if (normalVel < 0f) {
-                        // Inelastic collision for resting contacts (< 40 px/s) to prevent micro-bounce jitter
-                        val rest = if (kotlin.math.abs(normalVel) < 40f) 0.0f else stickRestitution
+                        val isRestingContact = kotlin.math.abs(normalVel) < 30f
+                        val rest = if (isRestingContact) 0.0f else stickRestitution
                         val impulse = -(1f + rest) * normalVel / (1f / a.mass + 1f / b.mass)
                         val impX = nx * impulse
                         val impY = ny * impulse
@@ -405,14 +416,21 @@ class FloatingSticksEngine(
                         b.vx += impX / b.mass
                         b.vy += impY / b.mass
 
-                        a.angularVelocity -= (rAx * impY - rAy * impX) / a.momentOfInertia
-                        b.angularVelocity += (rBx * impY - rBy * impX) / b.momentOfInertia
+                        // CRITICAL: Suppress rotational torque during resting contact to prevent perpetual micro-rotation feedback loops!
+                        if (!isRestingContact) {
+                            a.angularVelocity -= (rAx * impY - rAy * impX) / a.momentOfInertia
+                            b.angularVelocity += (rBx * impY - rBy * impX) / b.momentOfInertia
+                        } else {
+                            a.angularVelocity *= 0.88f
+                            b.angularVelocity *= 0.88f
+                        }
 
-                        // Wood-on-wood tangent friction: allows sticks to grip and stack solidly!
+                        // Wood-on-wood tangent friction: allows sticks to grip and stack solidly without perpetual sliding
                         val tanX = -ny
                         val tanY = nx
                         val relVTan = relVx * tanX + relVy * tanY
-                        val fImp = relVTan * 0.35f
+                        val frictionFactor = if (isRestingContact) 0.65f else 0.35f
+                        val fImp = relVTan * frictionFactor
                         a.vx += tanX * fImp * 0.5f
                         a.vy += tanY * fImp * 0.5f
                         b.vx -= tanX * fImp * 0.5f

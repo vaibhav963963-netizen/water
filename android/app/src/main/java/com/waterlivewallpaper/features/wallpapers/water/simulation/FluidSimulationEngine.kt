@@ -44,12 +44,12 @@ class FluidSimulationEngine(
     private val particles = ArrayList<Particle>()
     private val particleRadius = 30f
     private val restDensity = 2.6f
-    private val stiffness = 2800f
-    private val viscosity = 35f // Water kinematic viscosity: flows freely with natural wave momentum
-    private val surfaceTensionCoeff = 35f
+    private val stiffness = 3800f
+    private val viscosity = 32f // Water kinematic viscosity: flows freely with natural wave momentum
+    private val surfaceTensionCoeff = 38f
     private val boundaryDamping = 0.50f
     private val maxVelocity = 4000f
-    private val dropletMergeRadius = 46f
+    private val dropletMergeRadius = 42f
 
     private var gravityX = 0f
     private var gravityY = 9.8f * 520f * physicsSensitivity * flowSpeed
@@ -306,17 +306,18 @@ class FluidSimulationEngine(
                     }
                 }
 
-                // Droplet detachment: ONLY particles flying through low-density air
-                if (!pi.isDroplet && pi.density < restDensity * 0.40f) {
+                // Droplet detachment: ONLY particles genuinely ejected into low-density air
+                if (!pi.isDroplet && pi.density < restDensity * 0.28f) {
                     val speed2 = pi.vx * pi.vx + pi.vy * pi.vy
-                    if (speed2 > dropThreshold2 && Random.nextFloat() < 0.25f) {
+                    if (speed2 > dropThreshold2 * 1.2f && Random.nextFloat() < 0.18f) {
                         pi.isDroplet = true
-                        pi.radius = particleRadius * (0.60f + Random.nextFloat() * 0.35f)
+                        // Realistic tiny spray droplets (5 to 10 pixels radius) instead of giant bubbles
+                        pi.radius = particleRadius * (0.20f + Random.nextFloat() * 0.14f)
                         pi.lifetime = 0f
                     }
                 }
 
-                if (pi.isDroplet && pi.density >= restDensity * 0.55f) {
+                if (pi.isDroplet && pi.density >= restDensity * 0.50f) {
                     pi.isDroplet = false
                     pi.radius = particleRadius
                 }
@@ -328,21 +329,21 @@ class FluidSimulationEngine(
                 pi.vy += ay * dt
             }
 
-            // 3. Integration & Adaptive State Transitions
+            // 3. Integration & Natural Fluid Momentum Preservation
             var maxV2InStep = 0f
             var sumSpeed = 0f
 
             for (i in 0 until count) {
                 val pi = particles[i]
 
-                // Standard natural liquid momentum drag
-                pi.vx *= 0.992f
-                pi.vy *= 0.992f
+                // Standard natural liquid momentum drag: allows continuous sloshing and waves
+                pi.vx *= 0.994f
+                pi.vy *= 0.994f
 
-                // In SETTLING state: progressively damp micro-velocities toward absolute rest
+                // In SETTLING state: gentle, organic wave decay (never sudden freezes)
                 if (state == SimulationState.SETTLING) {
-                    pi.vx *= 0.85f
-                    pi.vy *= 0.85f
+                    pi.vx *= 0.976f
+                    pi.vy *= 0.976f
                 }
 
                 val v2 = pi.vx * pi.vx + pi.vy * pi.vy
@@ -362,7 +363,8 @@ class FluidSimulationEngine(
 
                 if (pi.isDroplet) {
                     pi.lifetime += dt
-                    if (pi.lifetime > 2.0f && v2 < 14400f) {
+                    // Airborne spray droplets reabsorb quickly into the fluid
+                    if (pi.lifetime > 1.2f || v2 < 900f) {
                         pi.isDroplet = false
                         pi.radius = particleRadius
                     }
@@ -371,14 +373,42 @@ class FluidSimulationEngine(
                 handleWallCollision(pi)
             }
 
+            // 4. Volume Preservation & Anti-Corner-Collapse Constraint:
+            // Prevents fluid particles from compressing into a single point/dot at screen corners
+            val minSeparation = particleRadius * 1.15f
+            val minSep2 = minSeparation * minSeparation
+            for (i in 0 until count) {
+                val pi = particles[i]
+                if (pi.isDroplet) continue
+                for (j in i + 1 until count) {
+                    val pj = particles[j]
+                    if (pj.isDroplet) continue
+                    val dx = pj.x - pi.x
+                    val dy = pj.y - pi.y
+                    val d2 = dx * dx + dy * dy
+                    if (d2 < minSep2 && d2 > 0.001f) {
+                        val d = kotlin.math.sqrt(d2)
+                        val push = (minSeparation - d) * 0.28f
+                        val nx = dx / d
+                        val ny = dy / d
+                        pi.x -= nx * push
+                        pi.y -= ny * push
+                        pj.x += nx * push
+                        pj.y += ny * push
+                    }
+                }
+                handleWallCollision(pi)
+            }
+
             maxVelocityObserved = kotlin.math.sqrt(maxV2InStep)
             avgVelocityObserved = sumSpeed / count
 
             // STATE MACHINE TRANSITIONS:
             if (state == SimulationState.ACTIVE) {
-                if (maxVelocityObserved < 350f && avgVelocityObserved < 160f) {
+                // Calm threshold: wait until waves naturally subside before settling
+                if (maxVelocityObserved < 130f && avgVelocityObserved < 50f) {
                     settlingDuration += dt
-                    if (settlingDuration > 0.20f) {
+                    if (settlingDuration > 0.40f) {
                         state = SimulationState.SETTLING
                         settlingDuration = 0f
                     }
@@ -386,13 +416,13 @@ class FluidSimulationEngine(
                     settlingDuration = 0f
                 }
             } else if (state == SimulationState.SETTLING) {
-                if (maxVelocityObserved > 450f) {
+                if (maxVelocityObserved > 220f || avgVelocityObserved > 75f) {
                     state = SimulationState.ACTIVE
                     settlingDuration = 0f
                 } else {
                     settlingDuration += dt
-                    // After 0.35s in settling, enter complete equilibrium SLEEP
-                    if (settlingDuration > 0.35f) {
+                    // After waves have completely decayed and motion is microscopic, enter SLEEP
+                    if (settlingDuration > 0.65f && maxVelocityObserved < 35f && avgVelocityObserved < 15f) {
                         for (p in particles) {
                             p.vx = 0f
                             p.vy = 0f

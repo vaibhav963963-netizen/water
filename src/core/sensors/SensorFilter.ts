@@ -25,7 +25,7 @@ export class SensorFilter {
 
   constructor(
     alpha: number = 0.82,
-    shakeThreshold: number = 14.0,
+    shakeThreshold: number = 4.2,
     shakeCooldownMs: number = 300
   ) {
     this.alpha = alpha;

@@ -409,8 +409,8 @@ export class FloatingSticksEngine {
           const normalVel = relVx * nx + relVy * ny;
 
           if (normalVel < 0) {
-            // Inelastic collision for resting contacts (< 40 px/s) to prevent micro-bounce jitter
-            const rest = Math.abs(normalVel) < 40 ? 0.0 : this.stickRestitution;
+            const isRestingContact = Math.abs(normalVel) < 30;
+            const rest = isRestingContact ? 0.0 : this.stickRestitution;
             const impulse = -(1 + rest) * normalVel / (1 / a.mass + 1 / b.mass);
             const impX = nx * impulse;
             const impY = ny * impulse;
@@ -420,14 +420,21 @@ export class FloatingSticksEngine {
             b.vx += impX / b.mass;
             b.vy += impY / b.mass;
 
-            a.angularVelocity -= (rAx * impY - rAy * impX) / a.momentOfInertia;
-            b.angularVelocity += (rBx * impY - rBy * impX) / b.momentOfInertia;
+            // Suppress rotational torque during resting contact to prevent perpetual micro-rotation feedback
+            if (!isRestingContact) {
+              a.angularVelocity -= (rAx * impY - rAy * impX) / a.momentOfInertia;
+              b.angularVelocity += (rBx * impY - rBy * impX) / b.momentOfInertia;
+            } else {
+              a.angularVelocity *= 0.88;
+              b.angularVelocity *= 0.88;
+            }
 
             // Wood-on-wood tangent friction: allows sticks to grip and stack solidly!
             const tanX = -ny;
             const tanY = nx;
             const relVTan = relVx * tanX + relVy * tanY;
-            const fImp = relVTan * 0.35;
+            const frictionFactor = isRestingContact ? 0.65 : 0.35;
+            const fImp = relVTan * frictionFactor;
             a.vx += tanX * fImp * 0.5;
             a.vy += tanY * fImp * 0.5;
             b.vx -= tanX * fImp * 0.5;

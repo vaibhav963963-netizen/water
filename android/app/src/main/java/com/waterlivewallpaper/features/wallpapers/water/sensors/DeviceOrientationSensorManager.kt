@@ -38,7 +38,7 @@ class DeviceOrientationSensorManager(
     private var lastCallbackGy = 0f
 
     private var lastShakeTimeNs: Long = 0L
-    private val shakeThresholdSq = 11.0f * 11.0f // Require vigorous shake gesture (> 11 m/s²)
+    private val shakeThresholdSq = 4.2f * 4.2f // Realistic physical hand shake gesture (~4.2 m/s² dynamic acceleration)
     private val shakeCooldownNs = 320_000_000L   // 320ms cooldown between splashes
 
     fun start(samplingPeriodUs: Int = 33_333) { // ~30 Hz: Optimal battery efficiency & silky fluid tracking
@@ -52,8 +52,8 @@ class DeviceOrientationSensorManager(
 
         if (linearAccelSensor != null) {
             sensorManager.registerListener(this, linearAccelSensor, samplingPeriodUs)
-        } else if (gravitySensor != null && accelerometer != null) {
-            // Accelerometer only needed as fallback when linear acceleration sensor is missing
+        }
+        if (accelerometer != null) {
             sensorManager.registerListener(this, accelerometer, samplingPeriodUs)
         }
     }
@@ -281,38 +281,38 @@ class DeviceOrientationSensorManager(
                     }
                 }
 
-                // If linear acceleration sensor is missing, calculate dynamic acceleration = total - gravity
-                if (linearAccelSensor == null) {
-                    val dax = ax - (-smoothGx)
-                    val day = ay - smoothGy
-                    val dynMag2 = dax * dax + day * day
+                // Universal dynamic acceleration shake detection (handles devices with or without TYPE_LINEAR_ACCELERATION)
+                val dax = ax - (-smoothGx)
+                val day = ay - smoothGy
+                val dynMag2 = dax * dax + day * day
 
-                    val nowNs = System.nanoTime()
-                    if (dynMag2 >= shakeThresholdSq && (nowNs - lastShakeTimeNs >= shakeCooldownNs)) {
-                        lastShakeTimeNs = nowNs
-                        var screenLinX = -dax
-                        var screenLinY = day
+                val nowNs = System.nanoTime()
+                if (dynMag2 >= shakeThresholdSq && (nowNs - lastShakeTimeNs >= shakeCooldownNs)) {
+                    lastShakeTimeNs = nowNs
+                    isStableLocked = false
+                    stableSamplesCount = 0
+                    var screenLinX = -dax
+                    var screenLinY = day
 
-                        when (displayRotation) {
-                            Surface.ROTATION_90 -> {
-                                screenLinX = -day
-                                screenLinY = -dax
-                            }
-                            Surface.ROTATION_180 -> {
-                                screenLinX = dax
-                                screenLinY = -day
-                            }
-                            Surface.ROTATION_270 -> {
-                                screenLinX = day
-                                screenLinY = dax
-                            }
-                            Surface.ROTATION_0 -> {}
+                    when (displayRotation) {
+                        Surface.ROTATION_90 -> {
+                            screenLinX = -day
+                            screenLinY = -dax
                         }
-
-                        val impulseX = screenLinX * 30f
-                        val impulseY = screenLinY * 30f
-                        onOrientationUpdate(smoothGx, smoothGy, true, impulseX, impulseY)
+                        Surface.ROTATION_180 -> {
+                            screenLinX = dax
+                            screenLinY = -day
+                        }
+                        Surface.ROTATION_270 -> {
+                            screenLinX = day
+                            screenLinY = dax
+                        }
+                        Surface.ROTATION_0 -> {}
                     }
+
+                    val impulseX = screenLinX * 30f
+                    val impulseY = screenLinY * 30f
+                    onOrientationUpdate(smoothGx, smoothGy, true, impulseX, impulseY)
                 }
             }
         }

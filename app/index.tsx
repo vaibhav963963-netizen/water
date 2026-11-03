@@ -22,8 +22,49 @@ import {
   Toolbox3D,
   Clock3D,
 } from '../src/features/dashboard/Stickers3D';
+import { MiniMobilePhoneFrame } from '../src/components/MiniMobilePhoneFrame';
 
 type ActiveScreen = 'home' | 'wallpapers' | 'coming_soon' | 'settings';
+
+interface InstalledWallpaperItem {
+  id: string;
+  type: 'water' | 'sticks';
+  title: string;
+  subtitle: string;
+  badge: string;
+  badgeBg: string;
+  badgeBorder: string;
+  badgeTextColor: string;
+  previewRoute: string;
+  customizeRoute: string;
+}
+
+const INSTALLED_WALLPAPERS: InstalledWallpaperItem[] = [
+  {
+    id: 'water',
+    type: 'water',
+    title: 'Liquid Fluid',
+    subtitle: 'Navier-Stokes SPH',
+    badge: 'ACTIVE & INSTALLED',
+    badgeBg: Colors.softCream,
+    badgeBorder: Colors.champagneGold,
+    badgeTextColor: Colors.milanoRed,
+    previewRoute: '/preview',
+    customizeRoute: '/customize?type=water',
+  },
+  {
+    id: 'sticks',
+    type: 'sticks',
+    title: 'Floating Sticks',
+    subtitle: '3D Driftwood Twigs',
+    badge: 'NEW • 3D PHYSICS',
+    badgeBg: '#FBF8E6',
+    badgeBorder: '#C49A45',
+    badgeTextColor: '#88502B',
+    previewRoute: '/preview?type=sticks',
+    customizeRoute: '/customize?type=sticks',
+  },
+];
 
 interface ComingSoonModule {
   id: string;
@@ -274,152 +315,109 @@ export default function AppEntry() {
   );
 
   /* ================================================================
-     2. DEDICATED WALLPAPER LISTING SCREEN (SINGLE REAL ENTRY)
+     2. DEDICATED WALLPAPER LISTING SCREEN (2-COLUMN GRID WITH MOBILE FRAMES)
      ================================================================ */
-  const renderWallpaperListScreen = () => (
-    <ScrollView
-      style={styles.scrollContainer}
-      contentContainerStyle={styles.scrollContent}
-      showsVerticalScrollIndicator={false}
-    >
-      {/* Top Header */}
-      <View style={styles.screenHeader}>
-        <TouchableOpacity
-          style={styles.backButton}
-          onPress={() => setActiveScreen('home')}
-          activeOpacity={0.8}
-        >
-          <Text style={styles.backButtonText}>← Dashboard</Text>
-        </TouchableOpacity>
-        <Text style={styles.screenTitle}>Live Wallpapers</Text>
-        <Text style={styles.screenSubtitle}>
-          Installed interactive physics-based wallpapers
-        </Text>
-      </View>
+  const renderWallpaperListScreen = () => {
+    const screenWidth = Dimensions.get('window').width;
+    const gridGap = 12;
+    // 20px padding on each side -> total 40px padding
+    const cardWidth = Math.floor((screenWidth - 40 - gridGap) / 2);
+    // Scaled miniature phone frame width & height
+    const phoneWidth = Math.min(138, Math.floor(cardWidth - 14));
+    const phoneHeight = Math.round(phoneWidth * 1.66);
 
-      {/* The Single Real Wallpaper Entry */}
-      <View style={styles.wallpaperEntryCard}>
-        {/* Card Header with Status */}
-        <View style={styles.wallpaperCardHeader}>
-          <View style={styles.badgeActive}>
-            <Text style={styles.badgeActiveText}>INSTALLED & ACTIVE</Text>
-          </View>
-          <Text style={styles.wallpaperTechLabel}>OpenGL ES • 60-120 FPS</Text>
-        </View>
-
-        {/* Visual Banner Preview */}
-        <View style={styles.wallpaperBanner}>
-          <View style={styles.bannerArtCircle}>
-            <WaterDrop3D size={72} />
-          </View>
-          <View style={styles.bannerMeta}>
-            <Text style={styles.bannerTitle}>Liquid Fluid Wallpaper</Text>
-            <Text style={styles.bannerSubtitle}>Native 2D Incompressible Navier-Stokes</Text>
-          </View>
-        </View>
-
-        {/* Feature Highlights */}
-        <Text style={styles.wallpaperDescription}>
-          Real-time interactive water simulation responding dynamically to device tilt, touch ripples, and inertial shake gestures.
-        </Text>
-
-        <View style={styles.featurePillRow}>
-          <View style={styles.featurePill}>
-            <Text style={styles.featurePillText}>✓ Gyroscope Tilt</Text>
-          </View>
-          <View style={styles.featurePill}>
-            <Text style={styles.featurePillText}>✓ Touch Ripples</Text>
-          </View>
-          <View style={styles.featurePill}>
-            <Text style={styles.featurePillText}>✓ Shake Splash</Text>
-          </View>
-        </View>
-
-        {/* Actions */}
-        <View style={styles.cardActionsRow}>
+    return (
+      <ScrollView
+        style={styles.scrollContainer}
+        contentContainerStyle={styles.scrollContent}
+        showsVerticalScrollIndicator={false}
+      >
+        {/* Top Header */}
+        <View style={styles.screenHeader}>
           <TouchableOpacity
-            style={styles.btnSecondary}
-            onPress={() => router.push({ pathname: '/customize', params: { type: 'water' } })}
+            style={styles.backButton}
+            onPress={() => setActiveScreen('home')}
             activeOpacity={0.8}
           >
-            <Text style={styles.btnSecondaryText}>Customize ⚙</Text>
+            <Text style={styles.backButtonText}>← Dashboard</Text>
           </TouchableOpacity>
-
-          <TouchableOpacity
-            style={styles.btnPrimary}
-            onPress={() => router.push('/preview')}
-            activeOpacity={0.85}
-          >
-            <Text style={styles.btnPrimaryText}>Open Live Preview →</Text>
-          </TouchableOpacity>
-        </View>
-      </View>
-
-      {/* 2. Floating Sticks Live Wallpaper */}
-      <View style={[styles.wallpaperEntryCard, { marginTop: 18 }]}>
-        {/* Card Header with Status */}
-        <View style={styles.wallpaperCardHeader}>
-          <View style={[styles.badgeActive, { backgroundColor: '#FBF8E6', borderColor: '#C49A45' }]}>
-            <Text style={[styles.badgeActiveText, { color: '#88502B' }]}>NEW • 3D RIGID BODY</Text>
-          </View>
-          <Text style={styles.wallpaperTechLabel}>OpenGL ES • 60-120 FPS</Text>
+          <Text style={styles.screenTitle}>Live Wallpapers</Text>
+          <Text style={styles.screenSubtitle}>
+            Installed interactive physics-based wallpapers
+          </Text>
         </View>
 
-        {/* Visual Banner Preview */}
-        <View style={styles.wallpaperBanner}>
-          <View style={[styles.bannerArtCircle, { backgroundColor: '#F4ECE1' }]}>
-            <Image
-              source={require('../assets/stickers/stick_twig_1.png')}
-              style={{ width: 72, height: 28, transform: [{ rotate: '-10deg' }] }}
-              resizeMode="contain"
-            />
-          </View>
-          <View style={styles.bannerMeta}>
-            <Text style={styles.bannerTitle}>Floating Sticks Wallpaper</Text>
-            <Text style={styles.bannerSubtitle}>3D Driftwood Twigs &amp; Inertial Physics</Text>
-          </View>
+        {/* 2-Side-By-Side Wallpapers Grid */}
+        <View style={styles.wallpaperGridContainer}>
+          {INSTALLED_WALLPAPERS.map((wp) => (
+            <View
+              key={wp.id}
+              style={[
+                styles.wallpaperGridCard,
+                { width: cardWidth },
+              ]}
+            >
+              {/* Proper Mobile Phone Mockup Frame with Live Wallpaper Preview */}
+              <View style={styles.phoneFrameWrapper}>
+                <MiniMobilePhoneFrame
+                  type={wp.type}
+                  settings={settings}
+                  width={phoneWidth}
+                  height={phoneHeight}
+                  onPress={() => router.push(wp.previewRoute as any)}
+                />
+              </View>
+
+              {/* Wallpaper Details */}
+              <View style={styles.gridCardMeta}>
+                <View
+                  style={[
+                    styles.gridBadge,
+                    { backgroundColor: wp.badgeBg, borderColor: wp.badgeBorder },
+                  ]}
+                >
+                  <Text
+                    style={[styles.gridBadgeText, { color: wp.badgeTextColor }]}
+                    numberOfLines={1}
+                  >
+                    {wp.badge}
+                  </Text>
+                </View>
+
+                <Text style={styles.gridTitle} numberOfLines={1}>
+                  {wp.title}
+                </Text>
+                <Text style={styles.gridSubtitle} numberOfLines={1}>
+                  {wp.subtitle}
+                </Text>
+              </View>
+
+              {/* Action Buttons */}
+              <View style={styles.gridActionsCol}>
+                <TouchableOpacity
+                  style={styles.btnPrimaryMini}
+                  onPress={() => router.push(wp.previewRoute as any)}
+                  activeOpacity={0.85}
+                >
+                  <Text style={styles.btnPrimaryMiniText}>Preview →</Text>
+                </TouchableOpacity>
+
+                <TouchableOpacity
+                  style={styles.btnSecondaryMini}
+                  onPress={() => router.push(wp.customizeRoute as any)}
+                  activeOpacity={0.8}
+                >
+                  <Text style={styles.btnSecondaryMiniText}>Customize ⚙</Text>
+                </TouchableOpacity>
+              </View>
+            </View>
+          ))}
         </View>
 
-        {/* Feature Highlights */}
-        <Text style={styles.wallpaperDescription}>
-          Photorealistic 3D wooden driftwood twigs floating on canvas, reacting to gravity tilt, touch disturbance ripples, rotational torque, and real-time rigid-body collisions.
-        </Text>
-
-        <View style={styles.featurePillRow}>
-          <View style={styles.featurePill}>
-            <Text style={styles.featurePillText}>✓ Gyroscope Tilt</Text>
-          </View>
-          <View style={styles.featurePill}>
-            <Text style={styles.featurePillText}>✓ Touch Ripples</Text>
-          </View>
-          <View style={styles.featurePill}>
-            <Text style={styles.featurePillText}>✓ Stick Collisions</Text>
-          </View>
-        </View>
-
-        {/* Actions */}
-        <View style={styles.cardActionsRow}>
-          <TouchableOpacity
-            style={styles.btnSecondary}
-            onPress={() => router.push({ pathname: '/customize', params: { type: 'sticks' } })}
-            activeOpacity={0.8}
-          >
-            <Text style={styles.btnSecondaryText}>Customize ⚙</Text>
-          </TouchableOpacity>
-
-          <TouchableOpacity
-            style={styles.btnPrimary}
-            onPress={() => router.push({ pathname: '/preview', params: { type: 'sticks' } })}
-            activeOpacity={0.85}
-          >
-            <Text style={styles.btnPrimaryText}>Open Live Preview →</Text>
-          </TouchableOpacity>
-        </View>
-      </View>
-
-      <View style={{ height: 100 }} />
-    </ScrollView>
-  );
+        <View style={{ height: 100 }} />
+      </ScrollView>
+    );
+  };
 
   /* ================================================================
      3. COMING SOON SCREEN (CLEAN, NO FAKE DATA)
@@ -988,95 +986,100 @@ const styles = StyleSheet.create({
     marginTop: 2,
   },
 
-  /* Dedicated Wallpaper Screen */
-  wallpaperEntryCard: {
+  /* Dedicated Wallpaper Screen (2-Side-By-Side Grid with Mobile Phone Mockups) */
+  wallpaperGridContainer: {
+    flexDirection: 'row',
+    flexWrap: 'wrap',
+    justifyContent: 'space-between',
+    gap: 12,
+  },
+  wallpaperGridCard: {
     backgroundColor: Colors.warmWhite,
     borderRadius: 22,
-    padding: 18,
+    padding: 10,
+    paddingTop: 12,
     borderWidth: 1,
     borderColor: Colors.champagneGold,
     shadowColor: Colors.shadow,
     shadowOffset: { width: 0, height: 4 },
     shadowOpacity: 0.12,
-    shadowRadius: 10,
+    shadowRadius: 8,
     elevation: 3,
-  },
-  wallpaperCardHeader: {
-    flexDirection: 'row',
-    justifyContent: 'space-between',
+    marginBottom: 12,
     alignItems: 'center',
-    marginBottom: 16,
   },
-  wallpaperTechLabel: {
-    fontSize: 11,
-    fontWeight: '700',
-    color: Colors.warmGrey,
-  },
-  wallpaperBanner: {
-    backgroundColor: Colors.softCream,
-    borderRadius: 18,
-    padding: 16,
-    flexDirection: 'row',
+  phoneFrameWrapper: {
     alignItems: 'center',
-    gap: 16,
-    marginBottom: 16,
-    borderWidth: 1,
-    borderColor: Colors.champagneGold,
-  },
-  bannerArtCircle: {
-    width: 80,
-    height: 80,
-    borderRadius: 40,
-    backgroundColor: Colors.warmWhite,
     justifyContent: 'center',
+    paddingVertical: 2,
+    marginBottom: 8,
+  },
+  gridCardMeta: {
+    width: '100%',
     alignItems: 'center',
+    marginBottom: 10,
+  },
+  gridBadge: {
+    paddingHorizontal: 7,
+    paddingVertical: 2.5,
+    borderRadius: 8,
     borderWidth: 1,
-    borderColor: Colors.champagneGold,
+    marginBottom: 5,
   },
-  bannerMeta: {
-    flex: 1,
+  gridBadgeText: {
+    fontSize: 8.5,
+    fontWeight: '800',
+    letterSpacing: 0.4,
   },
-  bannerTitle: {
-    fontSize: 17,
+  gridTitle: {
+    fontSize: 14.5,
     fontWeight: '800',
     color: Colors.deepBlack,
+    textAlign: 'center',
+    marginBottom: 2,
   },
-  bannerSubtitle: {
-    fontSize: 12,
+  gridSubtitle: {
+    fontSize: 10.5,
     color: Colors.warmGrey,
-    marginTop: 3,
+    textAlign: 'center',
+    fontWeight: '500',
   },
-  wallpaperDescription: {
-    fontSize: 13,
-    color: Colors.deepCharcoal,
-    lineHeight: 19,
-    marginBottom: 16,
+  gridActionsCol: {
+    width: '100%',
+    gap: 6,
   },
-  featurePillRow: {
-    flexDirection: 'row',
-    flexWrap: 'wrap',
-    gap: 8,
-    marginBottom: 20,
+  btnPrimaryMini: {
+    backgroundColor: Colors.milanoRed,
+    paddingVertical: 8,
+    borderRadius: 12,
+    alignItems: 'center',
+    justifyContent: 'center',
+    shadowColor: Colors.milanoRed,
+    shadowOffset: { width: 0, height: 2 },
+    shadowOpacity: 0.25,
+    shadowRadius: 4,
+    elevation: 2,
   },
-  featurePill: {
-    backgroundColor: Colors.softCream,
-    paddingHorizontal: 10,
-    paddingVertical: 5,
-    borderRadius: 10,
+  btnPrimaryMiniText: {
+    fontSize: 11.5,
+    fontWeight: '800',
+    color: Colors.lemonChiffon,
+  },
+  btnSecondaryMini: {
+    backgroundColor: Colors.lemonChiffon,
+    paddingVertical: 7,
+    borderRadius: 12,
+    alignItems: 'center',
+    justifyContent: 'center',
     borderWidth: 1,
     borderColor: Colors.champagneGold,
   },
-  featurePillText: {
-    fontSize: 11,
-    fontWeight: '600',
+  btnSecondaryMiniText: {
+    fontSize: 11.5,
+    fontWeight: '700',
     color: Colors.deepCharcoal,
   },
-  cardActionsRow: {
-    flexDirection: 'row',
-    gap: 12,
-  },
   btnPrimary: {
-    flex: 1,
     backgroundColor: Colors.milanoRed,
     paddingVertical: 14,
     borderRadius: 16,
@@ -1094,7 +1097,6 @@ const styles = StyleSheet.create({
     color: Colors.lemonChiffon,
   },
   btnSecondary: {
-    flex: 1,
     backgroundColor: Colors.lemonChiffon,
     paddingVertical: 14,
     borderRadius: 16,
