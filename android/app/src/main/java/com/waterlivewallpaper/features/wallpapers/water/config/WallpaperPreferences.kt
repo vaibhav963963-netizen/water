@@ -120,6 +120,8 @@ class WallpaperPreferences(context: Context) {
         return q == QUALITY_BATTERY_SAVER || q == "low"
     }
 
+    fun isBatterySaver(): Boolean = isBatterySaverMode()
+
     fun getCachedWaterColor(): Int {
         ensureCache()
         return cachedWaterColorInt

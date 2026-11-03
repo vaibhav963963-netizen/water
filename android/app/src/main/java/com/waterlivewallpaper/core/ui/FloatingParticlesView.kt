@@ -12,7 +12,7 @@ import java.util.Random
  * Lightweight, battery-friendly ambient floating water droplets and micro-particles.
  * Automatically halts when detached or invisible.
  */
-class FloatingParticlesView @JvmOverloads constructor(
+open class FloatingParticlesView @JvmOverloads constructor(
     context: Context,
     attrs: AttributeSet? = null,
     defStyleAttr: Int = 0

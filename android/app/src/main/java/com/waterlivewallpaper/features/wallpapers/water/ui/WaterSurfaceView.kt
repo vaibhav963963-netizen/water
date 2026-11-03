@@ -11,7 +11,7 @@ import com.waterlivewallpaper.features.wallpapers.water.gl.WaterGlRenderer
 import com.waterlivewallpaper.features.wallpapers.water.sensors.DeviceOrientationSensorManager
 import com.waterlivewallpaper.features.wallpapers.water.simulation.FluidSimulationEngine
 
-class WaterSurfaceView @JvmOverloads constructor(
+open class WaterSurfaceView @JvmOverloads constructor(
     context: Context,
     attrs: AttributeSet? = null
 ) : SurfaceView(context, attrs), SurfaceHolder.Callback {

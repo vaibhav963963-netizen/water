@@ -19,6 +19,7 @@ import com.waterlivewallpaper.features.wallpapers.sticks.simulation.FloatingStic
 import com.waterlivewallpaper.features.wallpapers.water.config.WallpaperPreferences
 import com.waterlivewallpaper.features.wallpapers.water.gl.WaterShaderProgram
 import com.waterlivewallpaper.features.wallpapers.water.simulation.FluidSimulationEngine
+import kotlin.math.max
 import java.nio.ByteBuffer
 import java.nio.ByteOrder
 import java.nio.FloatBuffer

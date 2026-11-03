@@ -10,7 +10,7 @@ import com.waterlivewallpaper.features.wallpapers.water.gl.WaterGlRenderer
 import com.waterlivewallpaper.features.wallpapers.water.sensors.DeviceOrientationSensorManager
 import com.waterlivewallpaper.features.wallpapers.water.simulation.FluidSimulationEngine
 
-class WaterWallpaperService : WallpaperService() {
+open class WaterWallpaperService : WallpaperService() {
 
     override fun onCreateEngine(): Engine {
         return WaterWallpaperEngine()

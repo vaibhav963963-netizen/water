@@ -134,21 +134,6 @@ class FluidSimulationEngine(
             calmDuration = 0f
         }
     }
-                    Particle(
-                        x = px,
-                        y = py,
-                        vx = 0f,
-                        vy = 0f,
-                        radius = particleRadius,
-                        density = restDensity,
-                        pressure = 0f,
-                        isDroplet = false,
-                        lifetime = 0f
-                    )
-                )
-            }
-        }
-    }
 
     fun updateGravity(gx: Float, gy: Float) {
         // High-speed real-world scale: 520f base gives realistic, non-slomo snappy gravity
