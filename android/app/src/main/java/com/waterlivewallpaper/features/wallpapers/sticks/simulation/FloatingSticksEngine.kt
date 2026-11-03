@@ -9,6 +9,12 @@ import kotlin.math.sin
 import kotlin.math.sqrt
 import kotlin.random.Random
 
+enum class StickSimulationState {
+    ACTIVE,
+    SETTLING,
+    SLEEPING
+}
+
 /**
  * High-performance 2D rigid body physics engine for floating wooden sticks / twigs
  * interacting with SPH fluid dynamics (Archimedes buoyancy, viscous fluid drag,
@@ -20,24 +26,22 @@ class FloatingSticksEngine(
 ) {
     val sticks = ArrayList<FloatingStick>()
 
-    // Realistic viscous wood drag & rotational friction
-    private val linearDampingAir = 0.965f
-    private val linearDampingWater = 0.940f
-    private val angularDampingAir = 0.930f
-    private val angularDampingWater = 0.890f
     private val wallRestitution = 0.28f
     private val stickRestitution = 0.32f
-    private val buoyancyCoeff = 1.35f
-    private val fluidDragCoeff = 3.60f
 
-    @Volatile var isAsleep: Boolean = false
+    @Volatile var state: StickSimulationState = StickSimulationState.ACTIVE
         private set
 
-    @Volatile private var calmDuration = 0f
+    val isAsleep: Boolean
+        get() = state == StickSimulationState.SLEEPING
+
+    @Volatile private var settlingDuration = 0f
+    @Volatile private var maxVelocityObserved = 0f
+    @Volatile private var maxAngularVelocityObserved = 0f
 
     fun wakeUp() {
-        isAsleep = false
-        calmDuration = 0f
+        state = StickSimulationState.ACTIVE
+        settlingDuration = 0f
     }
 
     init {
@@ -116,9 +120,9 @@ class FloatingSticksEngine(
             wakeUp()
         }
 
-        if (isAsleep) return
+        if (state == StickSimulationState.SLEEPING) return
 
-        val dt = dtRaw.coerceIn(0.001f, 0.033f)
+        val dt = dtRaw.coerceIn(0.005f, 0.020f)
         val gx = fluidEngine.getGravityX()
         val gy = fluidEngine.getGravityY()
 
@@ -126,15 +130,17 @@ class FloatingSticksEngine(
             val numSticks = sticks.size
             if (numSticks == 0) return
 
+            var maxV2 = 0f
+            var maxW2 = 0f
+
             for (s in sticks) {
-                // 1. Numerical coupling with Fluid: Sample points along stick
                 val samples = s.getSamplePoints(5)
                 var totalBuoyancyX = 0f
                 var totalBuoyancyY = 0f
                 var totalDragX = 0f
                 var totalDragY = 0f
                 var totalTorque = 0f
-                var submergedPointsCount = 0
+                var sumImmersion = 0f
 
                 for (p in samples) {
                     val px = p[0]
@@ -142,97 +148,80 @@ class FloatingSticksEngine(
                     val rx = p[2]
                     val ry = p[3]
 
-                    val fluidSample = fluidEngine.sampleFluidAt(px, py, sampleRadius = s.radius * 2.8f)
+                    val fluidSample = fluidEngine.sampleFluidAt(px, py, sampleRadius = s.radius * 2.5f)
 
                     if (fluidSample.isSubmerged) {
-                        submergedPointsCount++
-                        val subFactor = (fluidSample.density).coerceIn(0.35f, 1.35f)
+                        val immersion = (fluidSample.density).coerceIn(0.2f, 1.0f)
+                        sumImmersion += immersion
 
-                        // Archimedes Buoyancy: acts opposite to gravity vector
-                        // Wood density (0.65) vs water (1.0) -> net upward force
-                        val buoyantScalar = (1.0f - s.woodDensity) * buoyancyCoeff * subFactor * (s.mass / samples.size)
+                        // Archimedes Buoyancy directly balances gravity when submerged
+                        val buoyantScalar = (1.0f / s.woodDensity) * immersion * (s.mass / samples.size)
                         val fbX = -gx * buoyantScalar
                         val fbY = -gy * buoyantScalar
 
                         totalBuoyancyX += fbX
                         totalBuoyancyY += fbY
 
-                        // Local point velocity = stick CM velocity + omega x r
+                        // Local point velocity
                         val pvx = s.vx - s.angularVelocity * ry
                         val pvy = s.vy + s.angularVelocity * rx
 
-                        // Viscous fluid drag: relative velocity between water and stick point
-                        val relVx = fluidSample.velocityX - pvx
-                        val relVy = fluidSample.velocityY - pvy
+                        val fluidVx = if (fluidEngine.isAsleep) 0f else fluidSample.velocityX
+                        val fluidVy = if (fluidEngine.isAsleep) 0f else fluidSample.velocityY
+                        val relVx = fluidVx - pvx
+                        val relVy = fluidVy - pvy
 
-                        val dragScalar = fluidDragCoeff * subFactor * 0.20f
-                        val fdX = relVx * dragScalar
-                        val fdY = relVy * dragScalar
+                        val dragCoeff = 8.0f * immersion
+                        val fdX = relVx * dragCoeff
+                        val fdY = relVy * dragCoeff
 
                         totalDragX += fdX
                         totalDragY += fdY
 
-                        // Torque = rx * Fy - ry * Fx
-                        val totalPointFx = fbX + fdX
-                        val totalPointFy = fbY + fdY
-                        val pointTorque = rx * totalPointFy - ry * totalPointFx
-                        totalTorque += pointTorque
+                        totalTorque += (rx * (fbY + fdY) - ry * (fbX + fdX))
                     }
                 }
 
-                s.submergedFraction = submergedPointsCount.toFloat() / samples.size
+                s.submergedFraction = sumImmersion / samples.size
 
-                // 2. Linear motion integration with realistic wood mass inertia (not hyper-sensitive)
-                val effectiveGx = gx * 0.40f
-                val effectiveGy = gy * 0.40f
-                val totalFx = s.mass * effectiveGx + totalBuoyancyX + totalDragX
-                val totalFy = s.mass * effectiveGy + totalBuoyancyY + totalDragY
+                val totalFx = s.mass * gx + totalBuoyancyX + totalDragX
+                val totalFy = s.mass * gy + totalBuoyancyY + totalDragY
 
-                val ax = totalFx / s.mass
-                val ay = totalFy / s.mass
+                s.vx += (totalFx / s.mass) * dt
+                s.vy += (totalFy / s.mass) * dt
 
-                s.vx += ax * dt
-                s.vy += ay * dt
-
-                // Damping
-                val linearDamping = if (s.submergedFraction > 0.2f) linearDampingWater else linearDampingAir
+                val linearDamping = if (s.submergedFraction > 0.2f) 0.94f else 0.97f
                 s.vx *= linearDamping
                 s.vy *= linearDamping
 
-                // Viscous quadratic resistance: gives wood realistic weight & natural terminal drift
-                val v2 = s.vx * s.vx + s.vy * s.vy
-                if (v2 > 100f) {
-                    val drag = (kotlin.math.sqrt(v2) * 0.002f).coerceAtMost(0.12f)
-                    s.vx *= (1f - drag)
-                    s.vy *= (1f - drag)
-                }
-
-                if (v2 > 2400f * 2400f) {
-                    val spd = sqrt(v2)
-                    s.vx = (s.vx / spd) * 2400f
-                    s.vy = (s.vy / spd) * 2400f
+                if (state == StickSimulationState.SETTLING) {
+                    s.vx *= 0.88f
+                    s.vy *= 0.88f
+                    s.angularVelocity *= 0.85f
                 }
 
                 s.x += s.vx * dt
                 s.y += s.vy * dt
 
-                // 3. Angular motion integration
                 val angularAccel = totalTorque / s.momentOfInertia
                 s.angularVelocity += angularAccel * dt
 
-                val angularDamping = if (s.submergedFraction > 0.2f) angularDampingWater else angularDampingAir
+                val angularDamping = if (s.submergedFraction > 0.2f) 0.90f else 0.95f
                 s.angularVelocity *= angularDamping
 
-                // Clamp angular velocity
                 s.angularVelocity = s.angularVelocity.coerceIn(-18f, 18f)
                 s.angle += s.angularVelocity * dt
 
-                // Normalize angle
                 if (s.angle > Math.PI) s.angle -= (2 * Math.PI).toFloat()
                 if (s.angle < -Math.PI) s.angle += (2 * Math.PI).toFloat()
+
+                val spd2 = s.vx * s.vx + s.vy * s.vy
+                val w2 = s.angularVelocity * s.angularVelocity
+                if (spd2 > maxV2) maxV2 = spd2
+                if (w2 > maxW2) maxW2 = w2
             }
 
-            // Multi-pass constraint solver: guarantees sticks stack on top of each other without tunneling
+            // Multi-pass constraint solver
             for (iter in 0 until 3) {
                 resolveStickCollisions()
                 for (s in sticks) {
@@ -240,47 +229,37 @@ class FloatingSticksEngine(
                 }
             }
 
-            // Resting sleep deadzone & kinetic energy monitoring
-            var maxV2 = 0f
-            var maxW2 = 0f
+            maxVelocityObserved = kotlin.math.sqrt(maxV2)
+            maxAngularVelocityObserved = kotlin.math.sqrt(maxW2)
 
-            for (s in sticks) {
-                val spd2 = s.vx * s.vx + s.vy * s.vy
-                val w2 = s.angularVelocity * s.angularVelocity
-                if (spd2 > maxV2) maxV2 = spd2
-                if (w2 > maxW2) maxW2 = w2
-
-                // Progressive resting damping
-                if (spd2 < 2500f) { // speed < 50 px/s
-                    s.vx *= 0.85f
-                    s.vy *= 0.85f
-                    s.angularVelocity *= 0.85f
-                    if (spd2 < 64f && w2 < 0.04f) {
-                        s.vx *= 0.60f
-                        s.vy *= 0.60f
-                        s.angularVelocity *= 0.60f
+            // State Transitions
+            if (state == StickSimulationState.ACTIVE) {
+                if (maxVelocityObserved < 150f && maxAngularVelocityObserved < 1.0f) {
+                    settlingDuration += dt
+                    if (settlingDuration > 0.20f) {
+                        state = StickSimulationState.SETTLING
+                        settlingDuration = 0f
                     }
-                    if (spd2 < 9f && w2 < 0.005f) {
-                        s.vx = 0f
-                        s.vy = 0f
-                        s.angularVelocity = 0f
+                } else {
+                    settlingDuration = 0f
+                }
+            } else if (state == StickSimulationState.SETTLING) {
+                if (maxVelocityObserved > 250f) {
+                    state = StickSimulationState.ACTIVE
+                    settlingDuration = 0f
+                } else {
+                    settlingDuration += dt
+                    if (settlingDuration > 0.35f && fluidEngine.isAsleep) {
+                        for (s in sticks) {
+                            s.vx = 0f
+                            s.vy = 0f
+                            s.angularVelocity = 0f
+                        }
+                        state = StickSimulationState.SLEEPING
+                        maxVelocityObserved = 0f
+                        maxAngularVelocityObserved = 0f
                     }
                 }
-            }
-
-            // Sleep transition: when sticks are motionless and fluid is asleep
-            if (maxV2 < 25f && maxW2 < 0.02f && fluidEngine.isAsleep) {
-                calmDuration += dt
-                if (calmDuration > 0.18f) {
-                    for (s in sticks) {
-                        s.vx = 0f
-                        s.vy = 0f
-                        s.angularVelocity = 0f
-                    }
-                    isAsleep = true
-                }
-            } else {
-                calmDuration = 0f
             }
         }
     }

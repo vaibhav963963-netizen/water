@@ -14,8 +14,17 @@ class TestFluidSolver {
     this.dropletMergeRadius = 26;
     this.gravityX = 0;
     this.gravityY = 980;
+    this._lastGx = 0;
+    this._lastGy = 980;
     this.particles = [];
+    this.state = 'ACTIVE';
+    this.settlingDuration = 0;
     this.init(0.4);
+  }
+
+  wakeUp() {
+    this.state = 'ACTIVE';
+    this.settlingDuration = 0;
   }
 
   init(volumeRatio) {
@@ -40,9 +49,17 @@ class TestFluidSolver {
         lifetime: 0,
       });
     }
+    this.wakeUp();
   }
 
   step(rawDt) {
+    if (this.gravityX !== this._lastGx || this.gravityY !== this._lastGy) {
+      this._lastGx = this.gravityX;
+      this._lastGy = this.gravityY;
+      this.wakeUp();
+    }
+    if (this.state === 'SLEEPING') return;
+
     const dt = Math.min(rawDt, 0.033);
     const h = this.particleRadius * 2.2;
     const h2 = h * h;
@@ -112,6 +129,11 @@ class TestFluidSolver {
       pi.vx = (pi.vx + ax * dt) * 0.995;
       pi.vy = (pi.vy + ay * dt) * 0.995;
 
+      if (this.state === 'SETTLING') {
+        pi.vx *= 0.85;
+        pi.vy *= 0.85;
+      }
+
       pi.x += pi.vx * dt;
       pi.y += pi.vy * dt;
 
@@ -121,6 +143,36 @@ class TestFluidSolver {
       if (pi.x > this.width - r) { pi.x = this.width - r; pi.vx = -pi.vx * this.damping; }
       if (pi.y < r) { pi.y = r; pi.vy = -pi.vy * this.damping; }
       if (pi.y > this.height - r) { pi.y = this.height - r; pi.vy = -pi.vy * this.damping; }
+    }
+
+    let maxV = 0;
+    let sumV = 0;
+    for (const p of this.particles) {
+      const spd = Math.hypot(p.vx, p.vy);
+      if (spd > maxV) maxV = spd;
+      sumV += spd;
+    }
+    const avgV = sumV / this.particles.length;
+
+    if (this.state === 'ACTIVE') {
+      if (maxV < 3000 && avgV < 550) {
+        this.settlingDuration += dt;
+        if (this.settlingDuration > 0.25) {
+          this.state = 'SETTLING';
+          this.settlingDuration = 0;
+        }
+      } else {
+        this.settlingDuration = 0;
+      }
+    } else if (this.state === 'SETTLING') {
+      this.settlingDuration += dt;
+      if (this.settlingDuration > 0.35) {
+        for (const p of this.particles) {
+          p.vx = 0;
+          p.vy = 0;
+        }
+        this.state = 'SLEEPING';
+      }
     }
   }
 }
@@ -211,5 +263,36 @@ test('Long-running simulation maintains numerical stability without NaNs or over
       assert.ok(p.x >= 0 && p.x <= solver.width, 'Particle must stay inside boundary');
       assert.ok(p.y >= 0 && p.y <= solver.height, 'Particle must stay inside boundary');
     }
+  }
+});
+
+test('State Machine: settles to complete equilibrium and guarantees zero drift during rest', () => {
+  const solver = new TestFluidSolver(360, 640);
+  let settledFrame = -1;
+
+  for (let f = 1; f <= 150; f++) {
+    solver.step(0.016);
+    const maxV = Math.max(...solver.particles.map(p => Math.hypot(p.vx, p.vy)));
+    if (maxV === 0) {
+      settledFrame = f;
+      break;
+    }
+  }
+
+  // Once settled to zero velocity, test 60 seconds (1800 frames) of resting stability
+  const initialPositions = solver.particles.map(p => ({ x: p.x, y: p.y }));
+  for (let f = 1; f <= 1800; f++) {
+    solver.step(0.016);
+    // Zero acceleration at equilibrium
+    for (const p of solver.particles) {
+      assert.equal(p.vx, 0, 'Velocity must stay at true 0');
+      assert.equal(p.vy, 0, 'Velocity must stay at true 0');
+    }
+  }
+
+  for (let i = 0; i < solver.particles.length; i++) {
+    const dx = solver.particles[i].x - initialPositions[i].x;
+    const dy = solver.particles[i].y - initialPositions[i].y;
+    assert.equal(Math.hypot(dx, dy), 0, 'Particle must experience exact 0.000000 px drift at rest');
   }
 });

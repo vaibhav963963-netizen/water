@@ -27,6 +27,12 @@ data class FluidSample(
     val isSubmerged: Boolean
 )
 
+enum class SimulationState {
+    ACTIVE,
+    SETTLING,
+    SLEEPING
+}
+
 class FluidSimulationEngine(
     private var screenWidth: Int,
     private var screenHeight: Int,
@@ -38,11 +44,11 @@ class FluidSimulationEngine(
     private val particles = ArrayList<Particle>()
     private val particleRadius = 30f
     private val restDensity = 2.6f
-    private val stiffness = 4200f
-    private val viscosity = 20f // Water kinematic viscosity: flows freely with natural wave momentum
-    private val surfaceTensionCoeff = 40f
-    private val boundaryDamping = 0.70f // Natural elastic container boundary reflection
-    private val maxVelocity = 4500f
+    private val stiffness = 2800f
+    private val viscosity = 35f // Water kinematic viscosity: flows freely with natural wave momentum
+    private val surfaceTensionCoeff = 35f
+    private val boundaryDamping = 0.50f
+    private val maxVelocity = 4000f
     private val dropletMergeRadius = 46f
 
     private var gravityX = 0f
@@ -66,22 +72,26 @@ class FluidSimulationEngine(
 
     private var isBatterySaver: Boolean = false
 
-    @Volatile var isAsleep: Boolean = false
+    @Volatile var state: SimulationState = SimulationState.ACTIVE
         private set
 
-    @Volatile private var maxVelocityObserved = 100f
-    @Volatile private var calmDuration = 0f
+    val isAsleep: Boolean
+        get() = state == SimulationState.SLEEPING
 
-    private var lastAwakeGx = 0f
-    private var lastAwakeGy = 9.8f * 520f
+    @Volatile private var maxVelocityObserved = 100f
+    @Volatile private var avgVelocityObserved = 50f
+    @Volatile private var settlingDuration = 0f
+
+    private var sleepGravityX = 0f
+    private var sleepGravityY = 9.8f * 520f * physicsSensitivity * flowSpeed
 
     fun wakeUp() {
-        isAsleep = false
-        calmDuration = 0f
+        state = SimulationState.ACTIVE
+        settlingDuration = 0f
     }
 
-    fun isFluidCalm(): Boolean = isAsleep || maxVelocityObserved < 40f
-    fun isFluidSettled(): Boolean = isAsleep || (maxVelocityObserved < 12f && calmDuration > 0.20f)
+    fun isFluidCalm(): Boolean = isAsleep || maxVelocityObserved < 80f
+    fun isFluidSettled(): Boolean = isAsleep || (state == SimulationState.SETTLING && settlingDuration > 0.15f)
 
     fun updateSettings(
         volume: Float,
@@ -145,28 +155,29 @@ class FluidSimulationEngine(
                 )
             }
             maxVelocityObserved = 50f
-            calmDuration = 0f
+            avgVelocityObserved = 20f
+            settlingDuration = 0f
         }
     }
 
     fun updateGravity(gx: Float, gy: Float) {
-        // High-speed real-world scale: 520f base gives realistic, non-slomo snappy gravity
         val scale = 520f * physicsSensitivity * flowSpeed
         val targetGx = gx * scale
         val targetGy = gy * scale
 
-        val dGx = targetGx - lastAwakeGx
-        val dGy = targetGy - lastAwakeGy
-        val deltaGSq = dGx * dGx + dGy * dGy
+        if (state == SimulationState.SLEEPING) {
+            val dGx = targetGx - sleepGravityX
+            val dGy = targetGy - sleepGravityY
+            val deltaGSq = dGx * dGx + dGy * dGy
 
-        // Wake up simulation if intentional tilt occurred (> 180 px/s² ~ 0.35 m/s²)
-        if (deltaGSq > 32400f) {
-            this.gravityX = targetGx
-            this.gravityY = targetGy
-            lastAwakeGx = targetGx
-            lastAwakeGy = targetGy
-            wakeUp()
-        } else if (!isAsleep) {
+            // Intentional tilt threshold: 0.35 m/s² (~2.2 degrees)
+            val threshold = 0.35f * scale
+            if (deltaGSq >= threshold * threshold) {
+                this.gravityX = targetGx
+                this.gravityY = targetGy
+                wakeUp()
+            }
+        } else {
             this.gravityX = targetGx
             this.gravityY = targetGy
         }
@@ -178,12 +189,9 @@ class FluidSimulationEngine(
             if (mag2 < 2.25f) return
 
             wakeUp()
-            maxVelocityObserved = 180f
-
             val impulseScale = flowSpeed * shakeSensitivity * 1.0f
 
             for (p in particles) {
-                // Free surface particles slosh with slightly larger wave amplitude
                 val heightFactor = (p.y / screenHeight.toFloat()).coerceIn(0.4f, 1.0f)
                 val jitter = (0.96f + Random.nextFloat() * 0.08f)
                 p.vx += impulseX * impulseScale * heightFactor * jitter
@@ -197,7 +205,6 @@ class FluidSimulationEngine(
             val radius = 190f
             val radius2 = radius * radius
             wakeUp()
-            maxVelocityObserved = 220f
 
             for (p in particles) {
                 val dx = p.x - touchX
@@ -214,18 +221,10 @@ class FluidSimulationEngine(
     }
 
     fun step(rawDt: Float) {
-        if (isAsleep) return
+        if (state == SimulationState.SLEEPING) return
 
-        val dt = rawDt.coerceIn(0.001f, 0.033f)
-        if (isFluidCalm()) {
-            // When fluid velocity is calm, 1 substep provides numerical stability while halving CPU cycles
-            stepSubstep(dt)
-        } else {
-            // 2 sub-steps for energetic wave dynamics and splash integrity
-            val subDt = dt * 0.5f
-            stepSubstep(subDt)
-            stepSubstep(subDt)
-        }
+        val dt = rawDt.coerceIn(0.005f, 0.020f)
+        stepSubstep(dt)
     }
 
     private fun stepSubstep(dt: Float) {
@@ -254,7 +253,6 @@ class FluidSimulationEngine(
                 }
 
                 pi.density = max(density, 0.6f)
-                // Smooth positive pressure repulsion
                 pi.pressure = max(0f, stiffness * (pi.density - restDensity))
             }
 
@@ -263,7 +261,6 @@ class FluidSimulationEngine(
             val dropThreshold2 = dropThreshold * dropThreshold
             val maxVel2 = maxVelocity * maxVelocity
             val dropletMergeRadius2 = dropletMergeRadius * dropletMergeRadius
-            var maxV2InStep = 0f
 
             for (i in 0 until count) {
                 val pi = particles[i]
@@ -279,32 +276,27 @@ class FluidSimulationEngine(
                     val dy = pj.y - pi.y
                     val r2 = dx * dx + dy * dy
 
-                    // Optimization: Check r2 < h2 first to eliminate >95% of hypot square root calls!
                     if (r2 < h2 && r2 > 0.0001f) {
                         val r = kotlin.math.sqrt(r2)
                         val normX = dx / r
                         val normY = dy / r
                         val q = 1f - r / h
 
-                        // Repulsive pressure gradient to maintain liquid volume
                         val avgPressure = (pi.pressure + pj.pressure) / (2f * pj.density)
-                        val pScalar = avgPressure * q * q * 4.5f
+                        val pScalar = avgPressure * q * q * 3.2f
                         fPressureX -= normX * pScalar
                         fPressureY -= normY * pScalar
 
-                        // Cohesive surface tension attraction pulling fluid into smooth continuous liquid
                         val cohesionScalar = surfaceTensionCoeff * q * q
                         fPressureX += normX * cohesionScalar
                         fPressureY += normY * cohesionScalar
 
-                        // Viscous damping between neighbors for smooth liquid flow
                         val dvx = pj.vx - pi.vx
                         val dvy = pj.vy - pi.vy
                         val vScalar = (viscosity / pj.density) * q
                         fViscosityX += dvx * vScalar
                         fViscosityY += dvy * vScalar
 
-                        // Seamless droplet merging when falling back into liquid body
                         if (pi.isDroplet && !pj.isDroplet && r2 < dropletMergeRadius2) {
                             pi.isDroplet = false
                             pi.radius = particleRadius
@@ -314,7 +306,7 @@ class FluidSimulationEngine(
                     }
                 }
 
-                // Droplet detachment: ONLY particles flying through low-density air!
+                // Droplet detachment: ONLY particles flying through low-density air
                 if (!pi.isDroplet && pi.density < restDensity * 0.40f) {
                     val speed2 = pi.vx * pi.vx + pi.vy * pi.vy
                     if (speed2 > dropThreshold2 && Random.nextFloat() < 0.25f) {
@@ -324,7 +316,6 @@ class FluidSimulationEngine(
                     }
                 }
 
-                // If a droplet is in or near the liquid body, restore full radius immediately!
                 if (pi.isDroplet && pi.density >= restDensity * 0.55f) {
                     pi.isDroplet = false
                     pi.radius = particleRadius
@@ -335,31 +326,35 @@ class FluidSimulationEngine(
 
                 pi.vx += ax * dt
                 pi.vy += ay * dt
+            }
 
-                // Low natural drag for authentic water momentum
-                pi.vx *= 0.9984f
-                pi.vy *= 0.9984f
+            // 3. Integration & Adaptive State Transitions
+            var maxV2InStep = 0f
+            var sumSpeed = 0f
 
-                // Velocity damping & settling
+            for (i in 0 until count) {
+                val pi = particles[i]
+
+                // Standard natural liquid momentum drag
+                pi.vx *= 0.992f
+                pi.vy *= 0.992f
+
+                // In SETTLING state: progressively damp micro-velocities toward absolute rest
+                if (state == SimulationState.SETTLING) {
+                    pi.vx *= 0.85f
+                    pi.vy *= 0.85f
+                }
+
                 val v2 = pi.vx * pi.vx + pi.vy * pi.vy
+                val speed = kotlin.math.sqrt(v2)
+
                 if (v2 > maxV2InStep) maxV2InStep = v2
+                sumSpeed += speed
 
                 if (v2 > maxVel2) {
-                    val speed = kotlin.math.sqrt(v2)
                     val ratio = maxVelocity / speed
                     pi.vx *= ratio
                     pi.vy *= ratio
-                } else if (v2 < 2025f) { // speed < 45 px/s: progressive settling friction
-                    pi.vx *= 0.82f
-                    pi.vy *= 0.82f
-                    if (v2 < 100f) { // speed < 10 px/s
-                        pi.vx *= 0.60f
-                        pi.vy *= 0.60f
-                    }
-                    if (v2 < 9f) { // speed < 3 px/s
-                        pi.vx = 0f
-                        pi.vy = 0f
-                    }
                 }
 
                 pi.x += pi.vx * dt
@@ -377,61 +372,36 @@ class FluidSimulationEngine(
             }
 
             maxVelocityObserved = kotlin.math.sqrt(maxV2InStep)
-            if (maxVelocityObserved < 18f) {
-                calmDuration += dt
-                // Once fluid has settled for 0.20s, enter deep sleep:
-                if (calmDuration > 0.20f) {
-                    for (p in particles) {
-                        p.vx = 0f
-                        p.vy = 0f
+            avgVelocityObserved = sumSpeed / count
+
+            // STATE MACHINE TRANSITIONS:
+            if (state == SimulationState.ACTIVE) {
+                if (maxVelocityObserved < 350f && avgVelocityObserved < 160f) {
+                    settlingDuration += dt
+                    if (settlingDuration > 0.20f) {
+                        state = SimulationState.SETTLING
+                        settlingDuration = 0f
                     }
-                    isAsleep = true
+                } else {
+                    settlingDuration = 0f
                 }
-            } else {
-                calmDuration = 0f
-            }
-
-            // 3. True Anti-Penetration Hard Core Constraint (fires ONLY on severe overlap, NOT on resting fluid)
-            val hardCoreDist = particleRadius * 1.15f
-            val hardCoreDist2 = hardCoreDist * hardCoreDist
-
-            if (maxVelocityObserved > 4f || gravityX != 0f) {
-                for (iter in 0 until 2) {
-                    for (i in 0 until count) {
-                        val pi = particles[i]
-                        for (j in i + 1 until count) {
-                            val pj = particles[j]
-                            val dx = pj.x - pi.x
-                            val dy = pj.y - pi.y
-                            val r2 = dx * dx + dy * dy
-
-                            if (r2 < hardCoreDist2 && r2 > 0.0001f) {
-                                val r = kotlin.math.sqrt(r2)
-                                val overlap = hardCoreDist - r
-                                val normX = dx / r
-                                val normY = dy / r
-
-                                // Relax particles apart along collision normal
-                                val correction = overlap * 0.5f
-                                pi.x -= normX * correction
-                                pi.y -= normY * correction
-                                pj.x += normX * correction
-                                pj.y += normY * correction
-
-                                // Inelastic contact velocity damping along normal (prevents artificial bounce jitter)
-                                val rvx = pi.vx - pj.vx
-                                val rvy = pi.vy - pj.vy
-                                val normalVel = rvx * normX + rvy * normY
-                                if (normalVel > 0f) {
-                                    val impulseVel = normalVel * 0.45f
-                                    pi.vx -= normX * impulseVel
-                                    pi.vy -= normY * impulseVel
-                                    pj.vx += normX * impulseVel
-                                    pj.vy += normY * impulseVel
-                                }
-                            }
+            } else if (state == SimulationState.SETTLING) {
+                if (maxVelocityObserved > 450f) {
+                    state = SimulationState.ACTIVE
+                    settlingDuration = 0f
+                } else {
+                    settlingDuration += dt
+                    // After 0.35s in settling, enter complete equilibrium SLEEP
+                    if (settlingDuration > 0.35f) {
+                        for (p in particles) {
+                            p.vx = 0f
+                            p.vy = 0f
                         }
-                        handleWallCollision(pi)
+                        state = SimulationState.SLEEPING
+                        sleepGravityX = gravityX
+                        sleepGravityY = gravityY
+                        maxVelocityObserved = 0f
+                        avgVelocityObserved = 0f
                     }
                 }
             }
