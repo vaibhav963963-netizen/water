@@ -248,12 +248,12 @@ class SticksGlRenderer(
 
             // Dynamic Frame Pacing
             val isInteracting = frameStartNs < interactionBoostUntilNs
-            val currentFrameIntervalNs = if (isInteracting) {
-                1_000_000_000L / 60L
-            } else if (preferences.isBatterySaver()) {
-                1_000_000_000L / 24L
-            } else {
-                frameIntervalNs
+            val isResting = simulationEngine.isAsleep && sticksEngine.isAsleep
+            val currentFrameIntervalNs = when {
+                isInteracting -> 1_000_000_000L / 60L
+                isResting -> if (preferences.isBatterySaver()) 1_000_000_000L / 15L else 1_000_000_000L / 20L
+                preferences.isBatterySaver() -> 1_000_000_000L / 24L
+                else -> frameIntervalNs
             }
 
             val frameTimeNs = System.nanoTime() - frameStartNs

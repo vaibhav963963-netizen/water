@@ -120,9 +120,15 @@ export const SticksSimulationView: React.FC<SticksSimulationViewProps> = ({
         if (Math.abs(gx) < 18) gx = 0;
         if (Math.abs(gy - 410 * speedMultiplier) < 35) gy = 410 * speedMultiplier;
 
-        gravityRef.current = { gx, gy };
+        const dGx = gx - gravityRef.current.gx;
+        const dGy = gy - gravityRef.current.gy;
+        if (dGx * dGx + dGy * dGy > 140) {
+          gravityRef.current = { gx, gy };
+          sticksEngineRef.current.wakeUp();
+        }
 
         if (filtered.isShakeTriggered) {
+          sticksEngineRef.current.wakeUp();
           const impulse = filtered.shakeMagnitude * 35 * (settings.shakeSensitivity ?? 1.0);
           sticksEngineRef.current.applyShakeImpulse(
             (Math.random() - 0.5) * impulse,
@@ -159,8 +165,13 @@ export const SticksSimulationView: React.FC<SticksSimulationViewProps> = ({
           sampleFluidAt: () => ({ density: 0, velocityX: 0, velocityY: 0, isSubmerged: false }),
         };
 
+        const wasAsleep = sticksEngineRef.current.isAsleep;
         sticksEngineRef.current.step(dt * speed, fluidProxy as any);
-        setSticks([...sticksEngineRef.current.getSticks()]);
+        const isNowAsleep = sticksEngineRef.current.isAsleep;
+
+        if (!isNowAsleep || !wasAsleep) {
+          setSticks([...sticksEngineRef.current.getSticks()]);
+        }
 
         // Update expanding ripples
         if (ripplesRef.current.length > 0) {
@@ -179,8 +190,10 @@ export const SticksSimulationView: React.FC<SticksSimulationViewProps> = ({
         if (now - lastFpsCheck >= 1000) {
           const fps = Math.round((frameCount * 1000) / (now - lastFpsCheck));
           let energy = 0;
-          for (const s of sticksEngineRef.current.getSticks()) {
-            energy += s.vx * s.vx + s.vy * s.vy;
+          if (!isNowAsleep) {
+            for (const s of sticksEngineRef.current.getSticks()) {
+              energy += s.vx * s.vx + s.vy * s.vy;
+            }
           }
           onStatsUpdate?.({
             fps,

@@ -30,6 +30,16 @@ class FloatingSticksEngine(
     private val buoyancyCoeff = 1.35f
     private val fluidDragCoeff = 3.60f
 
+    @Volatile var isAsleep: Boolean = false
+        private set
+
+    @Volatile private var calmDuration = 0f
+
+    fun wakeUp() {
+        isAsleep = false
+        calmDuration = 0f
+    }
+
     init {
         initializeDefaultSticks()
     }
@@ -46,26 +56,27 @@ class FloatingSticksEngine(
     fun initializeDefaultSticks(stickCount: Int = 5, scale: Float = 1.0f) {
         synchronized(sticks) {
             sticks.clear()
+            wakeUp()
             currentScale = scale
-            val count = stickCount.coerceIn(2, 15)
+            val count = stickCount.coerceIn(1, 15)
             val cols = kotlin.math.min(count, 4)
 
             for (i in 0 until count) {
                 val texIdx = (i % 6) + 1
-                // Natural wood dimensions: ~42% to 48% of 1080p screen width for authentic presence
+                // Natural wood dimensions: ~35% to 42% of 1080p screen width for realistic presence
                 val baseLen = when (texIdx) {
-                    1 -> 480f
-                    2 -> 520f
-                    3 -> 440f
-                    4 -> 500f
-                    5 -> 470f
-                    else -> 430f
+                    1 -> 420f
+                    2 -> 460f
+                    3 -> 380f
+                    4 -> 440f
+                    5 -> 410f
+                    else -> 370f
                 }
                 val baseRad = when (texIdx) {
-                    2 -> 42f
-                    4 -> 36f
+                    2 -> 40f
+                    4 -> 35f
                     6 -> 32f
-                    else -> 38f
+                    else -> 36f
                 }
 
                 val len = baseLen * scale
@@ -74,9 +85,9 @@ class FloatingSticksEngine(
                 val col = i % cols
                 val row = i / cols
                 val spacingX = screenWidth / (cols + 1f)
-                val initialX = spacingX * (col + 1f) + (Random.nextFloat() - 0.5f) * 20f
-                val initialY = screenHeight * 0.40f + row * (rad * 2.8f) + (Random.nextFloat() - 0.5f) * 30f
-                val initialAngle = (Random.nextFloat() - 0.5f) * 0.6f
+                val initialX = spacingX * (col + 1f) + (Random.nextFloat() - 0.5f) * 15f
+                val initialY = screenHeight * 0.45f + row * (rad * 3.2f) + (Random.nextFloat() - 0.5f) * 20f
+                val initialAngle = (Random.nextFloat() - 0.5f) * 0.5f
 
                 sticks.add(
                     FloatingStick(
@@ -101,6 +112,12 @@ class FloatingSticksEngine(
         dtRaw: Float,
         fluidEngine: FluidSimulationEngine
     ) {
+        if (!fluidEngine.isAsleep && isAsleep) {
+            wakeUp()
+        }
+
+        if (isAsleep) return
+
         val dt = dtRaw.coerceIn(0.001f, 0.033f)
         val gx = fluidEngine.getGravityX()
         val gy = fluidEngine.getGravityY()
@@ -223,15 +240,47 @@ class FloatingSticksEngine(
                 }
             }
 
-            // Resting sleep deadzone: completely eliminates idle vibration when mobile is still
+            // Resting sleep deadzone & kinetic energy monitoring
+            var maxV2 = 0f
+            var maxW2 = 0f
+
             for (s in sticks) {
                 val spd2 = s.vx * s.vx + s.vy * s.vy
                 val w2 = s.angularVelocity * s.angularVelocity
-                if (spd2 < 18f && w2 < 0.015f) {
-                    s.vx = 0f
-                    s.vy = 0f
-                    s.angularVelocity = 0f
+                if (spd2 > maxV2) maxV2 = spd2
+                if (w2 > maxW2) maxW2 = w2
+
+                // Progressive resting damping
+                if (spd2 < 2500f) { // speed < 50 px/s
+                    s.vx *= 0.85f
+                    s.vy *= 0.85f
+                    s.angularVelocity *= 0.85f
+                    if (spd2 < 64f && w2 < 0.04f) {
+                        s.vx *= 0.60f
+                        s.vy *= 0.60f
+                        s.angularVelocity *= 0.60f
+                    }
+                    if (spd2 < 9f && w2 < 0.005f) {
+                        s.vx = 0f
+                        s.vy = 0f
+                        s.angularVelocity = 0f
+                    }
                 }
+            }
+
+            // Sleep transition: when sticks are motionless and fluid is asleep
+            if (maxV2 < 25f && maxW2 < 0.02f && fluidEngine.isAsleep) {
+                calmDuration += dt
+                if (calmDuration > 0.18f) {
+                    for (s in sticks) {
+                        s.vx = 0f
+                        s.vy = 0f
+                        s.angularVelocity = 0f
+                    }
+                    isAsleep = true
+                }
+            } else {
+                calmDuration = 0f
             }
         }
     }
@@ -457,6 +506,7 @@ class FloatingSticksEngine(
 
     fun applyShakeImpulse(impulseX: Float, impulseY: Float) {
         synchronized(sticks) {
+            wakeUp()
             for (s in sticks) {
                 val jitter = (0.9f + Random.nextFloat() * 0.2f)
                 s.vx += impulseX * 1.2f * jitter
@@ -468,6 +518,7 @@ class FloatingSticksEngine(
 
     fun addTouchDisturbance(touchX: Float, touchY: Float, strength: Float = 700f) {
         synchronized(sticks) {
+            wakeUp()
             val touchRadius = 160f
             val touchRadius2 = touchRadius * touchRadius
 

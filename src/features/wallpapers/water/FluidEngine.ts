@@ -20,9 +20,16 @@ export class FluidEngine {
   private params: FluidSimulationParams;
   private width: number;
   private height: number;
-  private isSettled: boolean = false;
+  public isSettled: boolean = false;
+  public isAsleep: boolean = false;
+  private calmDuration: number = 0;
   private maxVelocity: number = 2400;
   private shakeEnergy: number = 0;
+
+  public wakeUp(): void {
+    this.isAsleep = false;
+    this.calmDuration = 0;
+  }
 
   constructor(width: number, height: number, settings: WallpaperSettings) {
     this.width = width;
@@ -82,11 +89,22 @@ export class FluidEngine {
 
   public updateGravity(gx: number, gy: number, sensitivity: number): void {
     const scale = 110 * sensitivity;
-    this.params.gravityX = gx * scale;
-    this.params.gravityY = gy * scale;
+    const targetGx = gx * scale;
+    const targetGy = gy * scale;
+    const dGx = targetGx - this.params.gravityX;
+    const dGy = targetGy - this.params.gravityY;
+    if (dGx * dGx + dGy * dGy > 200) {
+      this.params.gravityX = targetGx;
+      this.params.gravityY = targetGy;
+      this.wakeUp();
+    } else if (!this.isAsleep) {
+      this.params.gravityX = targetGx;
+      this.params.gravityY = targetGy;
+    }
   }
 
   public applyImpulse(impulseX: number, impulseY: number): void {
+    this.wakeUp();
     this.shakeEnergy += Math.hypot(impulseX, impulseY);
     const dropThreshold = this.params.dropletSeparationThreshold;
 
@@ -107,6 +125,7 @@ export class FluidEngine {
   }
 
   public addTouchDisturbance(touchX: number, touchY: number, strength: number = 550): void {
+    this.wakeUp();
     for (let i = 0; i < this.particles.length; i++) {
       const p = this.particles[i];
       const dx = p.x - touchX;
@@ -123,6 +142,8 @@ export class FluidEngine {
   }
 
   public step(dt: number): void {
+    if (this.isAsleep) return;
+
     const clampedDt = Math.min(dt, 0.033);
     const h = this.params.particleRadius * 2.2;
     const h2 = h * h;
@@ -258,6 +279,19 @@ export class FluidEngine {
     }
     const avgEnergy = totalKineticEnergy / this.particles.length;
     this.isSettled = avgEnergy < 120 && this.shakeEnergy < 10;
+
+    if (avgEnergy < 15 && this.shakeEnergy < 2) {
+      this.calmDuration += clampedDt;
+      if (this.calmDuration > 0.20) {
+        for (let i = 0; i < this.particles.length; i++) {
+          this.particles[i].vx = 0;
+          this.particles[i].vy = 0;
+        }
+        this.isAsleep = true;
+      }
+    } else {
+      this.calmDuration = 0;
+    }
   }
 
   private handleBoundaryCollision(p: FluidParticle): void {

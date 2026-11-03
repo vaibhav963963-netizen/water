@@ -46,7 +46,14 @@ export class FloatingSticksEngine {
   private readonly buoyancyCoeff = 1.35;
   private readonly fluidDragCoeff = 3.60;
 
+  public isAsleep: boolean = false;
+  private calmDuration: number = 0;
   private stickScale: number = 1.0;
+
+  public wakeUp(): void {
+    this.isAsleep = false;
+    this.calmDuration = 0;
+  }
 
   constructor(width: number, height: number, stickCount: number = 5, scale: number = 1.0) {
     this.width = width;
@@ -70,8 +77,9 @@ export class FloatingSticksEngine {
 
   public initializeDefaultSticks(count: number = 5, scale: number = 1.0): void {
     this.sticks = [];
+    this.wakeUp();
     this.stickScale = scale;
-    const clampedCount = Math.max(2, Math.min(15, count));
+    const clampedCount = Math.max(1, Math.min(15, count));
     const cols = Math.min(clampedCount, 4);
 
     for (let i = 0; i < clampedCount; i++) {
@@ -113,6 +121,7 @@ export class FloatingSticksEngine {
   }
 
   public step(dtRaw: number, fluidEngine: IFluidSampler): void {
+    if (this.isAsleep) return;
     const dt = Math.max(0.001, Math.min(0.033, dtRaw));
     const gx = fluidEngine.getGravityX();
     const gy = fluidEngine.getGravityY();
@@ -211,16 +220,45 @@ export class FloatingSticksEngine {
       }
     }
 
-    // Resting sleep deadzone: completely eliminates idle vibration when mobile is still
+    // Resting sleep deadzone & kinetic energy monitoring
+    let maxV2 = 0;
+    let maxW2 = 0;
     for (let i = 0; i < this.sticks.length; i++) {
       const s = this.sticks[i];
       const spd2 = s.vx * s.vx + s.vy * s.vy;
       const w2 = s.angularVelocity * s.angularVelocity;
-      if (spd2 < 18 && w2 < 0.015) {
-        s.vx = 0;
-        s.vy = 0;
-        s.angularVelocity = 0;
+      if (spd2 > maxV2) maxV2 = spd2;
+      if (w2 > maxW2) maxW2 = w2;
+
+      if (spd2 < 2500) {
+        s.vx *= 0.85;
+        s.vy *= 0.85;
+        s.angularVelocity *= 0.85;
+        if (spd2 < 64 && w2 < 0.04) {
+          s.vx *= 0.60;
+          s.vy *= 0.60;
+          s.angularVelocity *= 0.60;
+        }
+        if (spd2 < 9 && w2 < 0.005) {
+          s.vx = 0;
+          s.vy = 0;
+          s.angularVelocity = 0;
+        }
       }
+    }
+
+    if (maxV2 < 25 && maxW2 < 0.02) {
+      this.calmDuration += dt;
+      if (this.calmDuration > 0.18) {
+        for (let i = 0; i < this.sticks.length; i++) {
+          this.sticks[i].vx = 0;
+          this.sticks[i].vy = 0;
+          this.sticks[i].angularVelocity = 0;
+        }
+        this.isAsleep = true;
+      }
+    } else {
+      this.calmDuration = 0;
     }
   }
 
@@ -448,6 +486,7 @@ export class FloatingSticksEngine {
   }
 
   public applyShakeImpulse(impulseX: number, impulseY: number): void {
+    this.wakeUp();
     for (let i = 0; i < this.sticks.length; i++) {
       const s = this.sticks[i];
       const jitter = 0.9 + Math.random() * 0.2;
@@ -458,6 +497,7 @@ export class FloatingSticksEngine {
   }
 
   public addTouchDisturbance(touchX: number, touchY: number, strength: number = 700): void {
+    this.wakeUp();
     const touchRadius = 160;
     const touchRadius2 = touchRadius * touchRadius;
 

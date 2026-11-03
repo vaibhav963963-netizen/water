@@ -22,6 +22,12 @@ class DeviceOrientationSensorManager(
     private var smoothGx = 0f
     private var smoothGy = 9.8f
 
+    // Dynamic Stability Lock / Latch: completely eliminates sensor tremor & micro-fluctuations when device is steady
+    private var latchedGx = 0f
+    private var latchedGy = 9.8f
+    private var isStableLocked = false
+    private var stableSamplesCount = 0
+
     private var prevAx = 0f
     private var prevAy = 0f
     private var prevAz = 0f
@@ -36,6 +42,8 @@ class DeviceOrientationSensorManager(
     private val shakeCooldownNs = 320_000_000L   // 320ms cooldown between splashes
 
     fun start(samplingPeriodUs: Int = 33_333) { // ~30 Hz: Optimal battery efficiency & silky fluid tracking
+        isStableLocked = false
+        stableSamplesCount = 0
         if (gravitySensor != null) {
             sensorManager.registerListener(this, gravitySensor, samplingPeriodUs)
         } else if (accelerometer != null) {
@@ -88,35 +96,65 @@ class DeviceOrientationSensorManager(
                     Surface.ROTATION_0 -> {}
                 }
 
-                // Check change delta
+                // If currently locked in steady state, check for intentional rotation:
+                if (isStableLocked) {
+                    val dLatchedX = targetGx - latchedGx
+                    val dLatchedY = targetGy - latchedGy
+                    val intentionalDeltaSq = dLatchedX * dLatchedX + dLatchedY * dLatchedY
+
+                    // Require at least ~2.5 deg tilt (0.42 m/s²) to break lock
+                    if (intentionalDeltaSq >= 0.1764f) {
+                        isStableLocked = false
+                        stableSamplesCount = 0
+                    } else {
+                        // Phone is stable: remain locked, suppress all noise updates
+                        return
+                    }
+                }
+
+                // Check motion velocity
                 val diffX = targetGx - smoothGx
                 val diffY = targetGy - smoothGy
                 val delta2 = diffX * diffX + diffY * diffY
 
-                // Filter resting hand tremor (< 0.15 m/s²)
+                // Heavy smoothing for gentle movements, fast response for energetic tilt
                 val alpha = when {
-                    delta2 < 0.0225f -> 0.92f // Resting
-                    delta2 < 0.36f -> 0.55f   // Gentle tilt
-                    else -> 0.15f             // Fast tilt / energetic movement
+                    delta2 < 0.04f -> 0.90f
+                    delta2 < 0.40f -> 0.60f
+                    else -> 0.20f
                 }
 
                 smoothGx = alpha * smoothGx + (1f - alpha) * targetGx
                 smoothGy = alpha * smoothGy + (1f - alpha) * targetGy
 
-                // Enhanced deadzone for physiological hand tremor (< 0.45 m/s² ~ 2.6 deg)
-                if (abs(smoothGx) < 0.45f) smoothGx = 0f
-                if (targetGy > 3.5f && smoothGx == 0f) {
-                    smoothGy = 9.8f
-                } else if (abs(smoothGy - 9.8f) < 0.35f) {
-                    smoothGy = 9.8f
+                // Stability detection: if sensor delta is consistently tiny (< 0.22 m/s²), latch steady state
+                if (delta2 < 0.0484f) {
+                    stableSamplesCount++
+                    if (stableSamplesCount >= 6) { // ~200ms of stillness
+                        isStableLocked = true
+                        // Snap near-zero upright deadzones
+                        if (abs(smoothGx) < 0.35f) smoothGx = 0f
+                        if (abs(smoothGy - 9.8f) < 0.35f && smoothGx == 0f) smoothGy = 9.8f
+
+                        latchedGx = smoothGx
+                        latchedGy = smoothGy
+
+                        val cbDiffX = smoothGx - lastCallbackGx
+                        val cbDiffY = smoothGy - lastCallbackGy
+                        if (cbDiffX * cbDiffX + cbDiffY * cbDiffY > 0.0016f) {
+                            lastCallbackGx = smoothGx
+                            lastCallbackGy = smoothGy
+                            onOrientationUpdate(smoothGx, smoothGy, false, 0f, 0f)
+                        }
+                        return
+                    }
+                } else {
+                    stableSamplesCount = 0
                 }
 
-                // Deliver updates if gravity changed or if it just snapped back to 0 at rest
                 val cbDiffX = smoothGx - lastCallbackGx
                 val cbDiffY = smoothGy - lastCallbackGy
-                val shouldUpdate = (cbDiffX * cbDiffX + cbDiffY * cbDiffY > 0.0064f) || 
-                                   (smoothGx == 0f && lastCallbackGx != 0f)
-                if (shouldUpdate) {
+                if (cbDiffX * cbDiffX + cbDiffY * cbDiffY > 0.0064f) {
                     lastCallbackGx = smoothGx
                     lastCallbackGy = smoothGy
                     onOrientationUpdate(smoothGx, smoothGy, false, 0f, 0f)
@@ -132,6 +170,8 @@ class DeviceOrientationSensorManager(
                 val nowNs = System.nanoTime()
                 if (linMag2 >= shakeThresholdSq && (nowNs - lastShakeTimeNs >= shakeCooldownNs)) {
                     lastShakeTimeNs = nowNs
+                    isStableLocked = false
+                    stableSamplesCount = 0
                     var screenLinX = -lx
                     var screenLinY = ly
 
@@ -184,21 +224,57 @@ class DeviceOrientationSensorManager(
                         Surface.ROTATION_0 -> {}
                     }
 
-                    smoothGx = 0.85f * smoothGx + 0.15f * targetGx
-                    smoothGy = 0.85f * smoothGy + 0.15f * targetGy
+                    if (isStableLocked) {
+                        val dLatchedX = targetGx - latchedGx
+                        val dLatchedY = targetGy - latchedGy
+                        val intentionalDeltaSq = dLatchedX * dLatchedX + dLatchedY * dLatchedY
+                        if (intentionalDeltaSq >= 0.1764f) {
+                            isStableLocked = false
+                            stableSamplesCount = 0
+                        } else {
+                            return
+                        }
+                    }
 
-                    if (abs(smoothGx) < 0.45f) smoothGx = 0f
-                    if (targetGy > 3.5f && smoothGx == 0f) {
-                        smoothGy = 9.8f
-                    } else if (abs(smoothGy - 9.8f) < 0.35f) {
-                        smoothGy = 9.8f
+                    val diffX = targetGx - smoothGx
+                    val diffY = targetGy - smoothGy
+                    val delta2 = diffX * diffX + diffY * diffY
+
+                    val alpha = when {
+                        delta2 < 0.04f -> 0.90f
+                        delta2 < 0.40f -> 0.60f
+                        else -> 0.20f
+                    }
+
+                    smoothGx = alpha * smoothGx + (1f - alpha) * targetGx
+                    smoothGy = alpha * smoothGy + (1f - alpha) * targetGy
+
+                    if (delta2 < 0.0484f) {
+                        stableSamplesCount++
+                        if (stableSamplesCount >= 6) {
+                            isStableLocked = true
+                            if (abs(smoothGx) < 0.35f) smoothGx = 0f
+                            if (abs(smoothGy - 9.8f) < 0.35f && smoothGx == 0f) smoothGy = 9.8f
+
+                            latchedGx = smoothGx
+                            latchedGy = smoothGy
+
+                            val cbDiffX = smoothGx - lastCallbackGx
+                            val cbDiffY = smoothGy - lastCallbackGy
+                            if (cbDiffX * cbDiffX + cbDiffY * cbDiffY > 0.0016f) {
+                                lastCallbackGx = smoothGx
+                                lastCallbackGy = smoothGy
+                                onOrientationUpdate(smoothGx, smoothGy, false, 0f, 0f)
+                            }
+                            return
+                        }
+                    } else {
+                        stableSamplesCount = 0
                     }
 
                     val cbDiffX = smoothGx - lastCallbackGx
                     val cbDiffY = smoothGy - lastCallbackGy
-                    val shouldUpdate = (cbDiffX * cbDiffX + cbDiffY * cbDiffY > 0.0064f) || 
-                                       (smoothGx == 0f && lastCallbackGx != 0f)
-                    if (shouldUpdate) {
+                    if (cbDiffX * cbDiffX + cbDiffY * cbDiffY > 0.0064f) {
                         lastCallbackGx = smoothGx
                         lastCallbackGy = smoothGy
                         onOrientationUpdate(smoothGx, smoothGy, false, 0f, 0f)

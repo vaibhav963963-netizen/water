@@ -66,11 +66,22 @@ class FluidSimulationEngine(
 
     private var isBatterySaver: Boolean = false
 
+    @Volatile var isAsleep: Boolean = false
+        private set
+
     @Volatile private var maxVelocityObserved = 100f
     @Volatile private var calmDuration = 0f
 
-    fun isFluidCalm(): Boolean = maxVelocityObserved < 40f
-    fun isFluidSettled(): Boolean = maxVelocityObserved < 8f && calmDuration > 0.8f
+    private var lastAwakeGx = 0f
+    private var lastAwakeGy = 9.8f * 520f
+
+    fun wakeUp() {
+        isAsleep = false
+        calmDuration = 0f
+    }
+
+    fun isFluidCalm(): Boolean = isAsleep || maxVelocityObserved < 40f
+    fun isFluidSettled(): Boolean = isAsleep || (maxVelocityObserved < 12f && calmDuration > 0.20f)
 
     fun updateSettings(
         volume: Float,
@@ -87,6 +98,8 @@ class FluidSimulationEngine(
         this.flowSpeed = speed
         this.isBatterySaver = batterySaver
 
+        wakeUp()
+
         if (volumeChanged || modeChanged) {
             this.waterVolumeRatio = volume
             initializeParticles(volume, batterySaver)
@@ -96,6 +109,7 @@ class FluidSimulationEngine(
     fun initializeParticles(volume: Float, batterySaver: Boolean = isBatterySaver) {
         synchronized(particles) {
             particles.clear()
+            wakeUp()
             // High particle density to form rich continuous fluid body:
             // In Battery Saver mode, uses slightly leaner particle budget (110 - 240) to reduce O(N^2) calculations
             val baseMin = if (batterySaver) 110 else 160
@@ -138,8 +152,24 @@ class FluidSimulationEngine(
     fun updateGravity(gx: Float, gy: Float) {
         // High-speed real-world scale: 520f base gives realistic, non-slomo snappy gravity
         val scale = 520f * physicsSensitivity * flowSpeed
-        this.gravityX = gx * scale
-        this.gravityY = gy * scale
+        val targetGx = gx * scale
+        val targetGy = gy * scale
+
+        val dGx = targetGx - lastAwakeGx
+        val dGy = targetGy - lastAwakeGy
+        val deltaGSq = dGx * dGx + dGy * dGy
+
+        // Wake up simulation if intentional tilt occurred (> 180 px/s² ~ 0.35 m/s²)
+        if (deltaGSq > 32400f) {
+            this.gravityX = targetGx
+            this.gravityY = targetGy
+            lastAwakeGx = targetGx
+            lastAwakeGy = targetGy
+            wakeUp()
+        } else if (!isAsleep) {
+            this.gravityX = targetGx
+            this.gravityY = targetGy
+        }
     }
 
     fun applyImpulse(impulseX: Float, impulseY: Float) {
@@ -147,7 +177,7 @@ class FluidSimulationEngine(
             val mag2 = impulseX * impulseX + impulseY * impulseY
             if (mag2 < 2.25f) return
 
-            calmDuration = 0f
+            wakeUp()
             maxVelocityObserved = 180f
 
             val impulseScale = flowSpeed * shakeSensitivity * 1.0f
@@ -166,7 +196,7 @@ class FluidSimulationEngine(
         synchronized(particles) {
             val radius = 190f
             val radius2 = radius * radius
-            calmDuration = 0f
+            wakeUp()
             maxVelocityObserved = 220f
 
             for (p in particles) {
@@ -184,6 +214,8 @@ class FluidSimulationEngine(
     }
 
     fun step(rawDt: Float) {
+        if (isAsleep) return
+
         val dt = rawDt.coerceIn(0.001f, 0.033f)
         if (isFluidCalm()) {
             // When fluid velocity is calm, 1 substep provides numerical stability while halving CPU cycles
@@ -317,17 +349,14 @@ class FluidSimulationEngine(
                     val ratio = maxVelocity / speed
                     pi.vx *= ratio
                     pi.vy *= ratio
-                } else if (gravityX == 0f && v2 < 2025f) { // speed < 45 px/s in stable mobile
+                } else if (v2 < 2025f) { // speed < 45 px/s: progressive settling friction
                     pi.vx *= 0.82f
                     pi.vy *= 0.82f
-                    if (v2 < 25f) { // speed < 5 px/s
-                        pi.vx = 0f
-                        pi.vy = 0f
+                    if (v2 < 100f) { // speed < 10 px/s
+                        pi.vx *= 0.60f
+                        pi.vy *= 0.60f
                     }
-                } else if (v2 < 625f) { // speed < 25 px/s
-                    pi.vx *= 0.90f
-                    pi.vy *= 0.90f
-                    if (v2 < 6.25f) {
+                    if (v2 < 9f) { // speed < 3 px/s
                         pi.vx = 0f
                         pi.vy = 0f
                     }
@@ -348,8 +377,16 @@ class FluidSimulationEngine(
             }
 
             maxVelocityObserved = kotlin.math.sqrt(maxV2InStep)
-            if (maxVelocityObserved < 8f) {
+            if (maxVelocityObserved < 18f) {
                 calmDuration += dt
+                // Once fluid has settled for 0.20s, enter deep sleep:
+                if (calmDuration > 0.20f) {
+                    for (p in particles) {
+                        p.vx = 0f
+                        p.vy = 0f
+                    }
+                    isAsleep = true
+                }
             } else {
                 calmDuration = 0f
             }
@@ -481,8 +518,8 @@ class FluidSimulationEngine(
             }
         }
 
-        val avgVx = if (countNearby > 0) sumVx / countNearby else 0f
-        val avgVy = if (countNearby > 0) sumVy / countNearby else 0f
+        val avgVx = if (!isAsleep && countNearby > 0) sumVx / countNearby else 0f
+        val avgVy = if (!isAsleep && countNearby > 0) sumVy / countNearby else 0f
         val isSubmerged = densityAccum > 0.35f
 
         return FluidSample(
