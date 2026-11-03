@@ -33,7 +33,7 @@ import java.util.concurrent.atomic.AtomicBoolean
 class SticksGlRenderer(
     private val context: Context,
     private val preferences: WallpaperPreferences,
-    private val simulationEngine: FluidSimulationEngine? = null,
+    private val simulationEngine: FluidSimulationEngine,
     private val sticksEngine: FloatingSticksEngine
 ) {
     companion object {
@@ -194,7 +194,7 @@ class SticksGlRenderer(
     fun onResize(w: Int, h: Int) {
         this.width = w
         this.height = h
-        simulationEngine?.setDimensions(w, h)
+        simulationEngine.setDimensions(w, h)
         sticksEngine.setDimensions(w, h)
     }
 
@@ -239,7 +239,7 @@ class SticksGlRenderer(
             lastFrameTimeNs = frameStartNs
 
             // Physics step
-            simulationEngine?.step(dt)
+            simulationEngine.step(dt)
             sticksEngine.step(dt, simulationEngine)
 
             // Render
