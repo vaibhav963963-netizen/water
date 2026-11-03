@@ -81,15 +81,22 @@ class DeviceOrientationSensorManager(
                     Surface.ROTATION_0 -> {}
                 }
 
-                // Adaptive Low-Pass Filter: Heavy smoothing when still, highly responsive when moving
+                // Dynamic Adaptive Low-Pass Filter:
+                // Heavy smoothing when still (no hand tremor/jitter),
+                // Instant zero-lag responsiveness when shaken or tilted fast!
                 val delta = sqrt((targetGx - smoothGx) * (targetGx - smoothGx) + (targetGy - smoothGy) * (targetGy - smoothGy))
-                val alpha = if (delta < 0.25f) 0.92f else 0.72f
+                val alpha = when {
+                    delta < 0.20f -> 0.94f // Resting: eliminate micro-jitter
+                    delta < 0.70f -> 0.60f // Slow gentle tilt: smooth transition
+                    delta < 2.00f -> 0.25f // Moderate tilt: rapid response
+                    else -> 0.06f          // Fast shake: immediate instant tracking without lag!
+                }
 
                 smoothGx = alpha * smoothGx + (1f - alpha) * targetGx
                 smoothGy = alpha * smoothGy + (1f - alpha) * targetGy
 
                 // Deadzone clamp to prevent micro-jitter when resting
-                if (abs(smoothGx) < 0.08f) smoothGx = 0f
+                if (abs(smoothGx) < 0.05f) smoothGx = 0f
 
                 onOrientationUpdate(smoothGx, smoothGy, false, 0f, 0f)
             }
@@ -134,8 +141,8 @@ class DeviceOrientationSensorManager(
                 prevAz = az
 
                 val jerkMag = sqrt(dax * dax + day * day + daz * daz)
-                // If movement exceeds quiet hand tremor threshold (> 3.5 m/s² jerk)
-                if (jerkMag > 3.5f) {
+                // If movement exceeds quiet hand tremor threshold (> 2.8 m/s² jerk)
+                if (jerkMag > 2.8f) {
                     var screenJerkX = -dax
                     var screenJerkY = day
 
@@ -155,9 +162,11 @@ class DeviceOrientationSensorManager(
                         Surface.ROTATION_0 -> {}
                     }
 
-                    // Continuous inertial impulse proportional to how fast/hard the device was moved
-                    val impulseX = screenJerkX * 28f
-                    val impulseY = screenJerkY * 28f
+                    // Quadratic kinetic boost: slow shakes stay natural and gentle,
+                    // but fast energetic shakes scale up aggressively!
+                    val intensityBoost = (1.0f + (jerkMag / 3.6f) * (jerkMag / 3.6f)).coerceAtMost(6.5f)
+                    val impulseX = screenJerkX * 36f * intensityBoost
+                    val impulseY = screenJerkY * 36f * intensityBoost
                     onOrientationUpdate(smoothGx, smoothGy, true, impulseX, impulseY)
                 }
             }
@@ -168,7 +177,7 @@ class DeviceOrientationSensorManager(
                 val lz = event.values[2]
                 val linMag = sqrt(lx * lx + ly * ly + lz * lz)
 
-                if (linMag > 2.5f) {
+                if (linMag > 2.0f) {
                     var screenLinX = -lx
                     var screenLinY = ly
 
@@ -188,8 +197,9 @@ class DeviceOrientationSensorManager(
                         Surface.ROTATION_0 -> {}
                     }
 
-                    val impulseX = screenLinX * 22f
-                    val impulseY = screenLinY * 22f
+                    val intensityBoost = (1.0f + (linMag / 2.8f) * (linMag / 2.8f)).coerceAtMost(6.5f)
+                    val impulseX = screenLinX * 30f * intensityBoost
+                    val impulseY = screenLinY * 30f * intensityBoost
                     onOrientationUpdate(smoothGx, smoothGy, true, impulseX, impulseY)
                 }
             }

@@ -32,14 +32,14 @@ export class FluidEngine {
       gravityY: 980 * settings.physicsSensitivity,
       width,
       height,
-      particleRadius: 26,
-      restDensity: 3.2,
-      stiffness: 16000,
-      viscosity: 75,
+      particleRadius: 30,
+      restDensity: 2.8,
+      stiffness: 14000,
+      viscosity: 28,
       surfaceTensionCoeff: 38,
-      damping: 0.42,
+      damping: 0.70,
       dropletSeparationThreshold: 750 / settings.shakeSensitivity,
-      dropletMergeRadius: 32,
+      dropletMergeRadius: 40,
     };
 
     this.initializeParticles(settings.waterVolume);
@@ -55,9 +55,9 @@ export class FluidEngine {
 
   public initializeParticles(volumeRatio: number): void {
     this.particles = [];
-    const baseCount = Math.floor(100 + volumeRatio * 180);
+    const baseCount = Math.floor(140 + volumeRatio * 240);
     const cols = Math.max(6, Math.floor(Math.sqrt(baseCount * (this.width / Math.max(1, this.height * 0.35)))));
-    const spacing = this.params.particleRadius * 1.45;
+    const spacing = this.params.particleRadius * 1.35;
 
     const startY = this.height - Math.ceil(baseCount / Math.max(1, cols)) * spacing - 25;
     const startX = (this.width - cols * spacing) / 2;

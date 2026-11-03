@@ -49,13 +49,10 @@ jobs:
           distribution: 'temurin'
           java-version: '17'
 
-      - name: 4. Setup Android SDK
-        uses: android-actions/setup-android@v3
-
-      - name: 5. Setup Gradle
+      - name: 4. Setup Gradle
         uses: gradle/actions/setup-gradle@v3
 
-      - name: 6. Configure Keystore Signing Identity
+      - name: 5. Configure Keystore Signing Identity
         run: |
           if [ -n "${{ secrets.ANDROID_KEYSTORE_BASE64 }}" ]; then
             echo "Using base64-encoded secret production keystore..."
@@ -65,20 +62,20 @@ jobs:
           fi
           test -f android/app/debug.keystore || { echo "Keystore missing!"; exit 1; }
 
-      - name: 7. Automatically Resolve Monotonic Version
+      - name: 6. Automatically Resolve Monotonic Version
         id: version_info
         run: node scripts/version-manager.js
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
           GITHUB_REPOSITORY: ${{ github.repository }}
 
-      - name: 8. Build Release APK with Dynamic Version
+      - name: 7. Build Release APK with Dynamic Version
         run: |
           chmod +x android/gradlew
           cd android
           ./gradlew assembleRelease -PversionCode=${{ steps.version_info.outputs.version_code }} -PversionName=${{ steps.version_info.outputs.version_name }} --stacktrace
 
-      - name: 9. Verify APK Signature & Compute SHA-256
+      - name: 8. Verify APK Signature & Compute SHA-256
         id: apk_audit
         run: |
           RELEASE_APK="android/app/build/outputs/apk/release/app-release.apk"
@@ -109,7 +106,7 @@ jobs:
           
           cat update_manifest.json
 
-      - name: 10. Publish GitHub Release with Assets
+      - name: 9. Publish GitHub Release with Assets
         uses: softprops/action-gh-release@v2
         with:
           tag_name: "${{ steps.version_info.outputs.tag_name }}"

@@ -29,14 +29,14 @@ class FluidSimulationEngine(
     private var flowSpeed: Float = 2.0f
 ) {
     private val particles = ArrayList<Particle>()
-    private val particleRadius = 32f
-    private val restDensity = 2.6f
-    private val stiffness = 3400f
-    private val viscosity = 42f // Real water has low viscosity (not thick syrup)
-    private val surfaceTensionCoeff = 46f
-    private val boundaryDamping = 0.45f
-    private val maxVelocity = 3800f
-    private val dropletMergeRadius = 44f
+    private val particleRadius = 35f
+    private val restDensity = 2.4f
+    private val stiffness = 4600f
+    private val viscosity = 16f // Low viscosity: water flows freely with energetic waves
+    private val surfaceTensionCoeff = 44f
+    private val boundaryDamping = 0.74f // High restitution: water splashes and surges energetically against boundaries
+    private val maxVelocity = 4800f
+    private val dropletMergeRadius = 50f
 
     private var gravityX = 0f
     private var gravityY = 9.8f * 520f * physicsSensitivity * flowSpeed
@@ -70,10 +70,11 @@ class FluidSimulationEngine(
     fun initializeParticles(volume: Float) {
         synchronized(particles) {
             particles.clear()
-            // High particle density to form rich continuous fluid body
-            val count = (120 + volume * 180).toInt().coerceIn(60, 360)
-            val cols = max(7, kotlin.math.sqrt(count * (screenWidth.toFloat() / max(1f, screenHeight * 0.35f))).toInt())
-            val spacing = particleRadius * 1.35f
+            // High particle density to form rich continuous fluid body:
+            // Scales with user volume setting so corner accumulation retains solid, deep water mass!
+            val count = (160 + volume * 260).toInt().coerceIn(100, 480)
+            val cols = max(8, kotlin.math.sqrt(count * (screenWidth.toFloat() / max(1f, screenHeight * 0.35f))).toInt())
+            val spacing = particleRadius * 1.28f
 
             val startY = screenHeight - (count / cols + 2) * spacing - 20f
             val startX = (screenWidth - cols * spacing) / 2f
@@ -115,20 +116,22 @@ class FluidSimulationEngine(
             val mag = hypot(impulseX, impulseY)
             if (mag < 5f) return
 
-            val dropThreshold = 800f / shakeSensitivity
+            // Dynamic impulse scaling: fast violent shake generates massive kinetic slosh!
+            val nonLinearFactor = 1.0f + (mag / 260f).coerceAtMost(4.0f)
+            val dropThreshold = 700f / shakeSensitivity
 
             for (p in particles) {
                 // Liquid surge driven by device inertia
-                val heightFactor = (p.y / screenHeight.toFloat()).coerceIn(0.25f, 1f)
-                val randJitter = (0.92f + Random.nextFloat() * 0.16f)
-                p.vx += impulseX * shakeSensitivity * randJitter * heightFactor * flowSpeed * 0.75f
-                p.vy += impulseY * shakeSensitivity * randJitter * heightFactor * flowSpeed * 0.75f
+                val heightFactor = (p.y / screenHeight.toFloat()).coerceIn(0.2f, 1f)
+                val randJitter = (0.90f + Random.nextFloat() * 0.20f)
+                p.vx += impulseX * shakeSensitivity * randJitter * heightFactor * flowSpeed * 1.35f * nonLinearFactor
+                p.vy += impulseY * shakeSensitivity * randJitter * heightFactor * flowSpeed * 1.35f * nonLinearFactor
 
-                // Energetic surface particles detach as realistic droplets
+                // Energetic surface particles detach as realistic droplets ONLY if detached from dense liquid body
                 val speed = hypot(p.vx, p.vy)
-                if (speed > dropThreshold && !p.isDroplet && Random.nextFloat() < 0.32f) {
+                if (speed > dropThreshold && !p.isDroplet && p.density < restDensity * 0.55f && Random.nextFloat() < 0.30f) {
                     p.isDroplet = true
-                    p.radius = particleRadius * (0.35f + Random.nextFloat() * 0.35f)
+                    p.radius = particleRadius * (0.60f + Random.nextFloat() * 0.35f)
                     p.lifetime = 0f
                 }
             }
@@ -240,14 +243,21 @@ class FluidSimulationEngine(
                     }
                 }
 
-                // Droplet detachment under high velocity and low neighbor density
-                if (!pi.isDroplet && pi.density < restDensity * 0.45f) {
+                // Droplet detachment: ONLY particles flying through low-density air!
+                // NEVER shrink particles in the dense pool (prevents corner volume collapse)
+                if (!pi.isDroplet && pi.density < restDensity * 0.40f) {
                     val speed = hypot(pi.vx, pi.vy)
-                    if (speed > dropThreshold) {
+                    if (speed > dropThreshold && Random.nextFloat() < 0.25f) {
                         pi.isDroplet = true
-                        pi.radius = particleRadius * (0.35f + Random.nextFloat() * 0.35f)
+                        pi.radius = particleRadius * (0.60f + Random.nextFloat() * 0.35f)
                         pi.lifetime = 0f
                     }
+                }
+
+                // If a droplet is in or near the liquid body, restore full radius immediately!
+                if (pi.isDroplet && pi.density >= restDensity * 0.55f) {
+                    pi.isDroplet = false
+                    pi.radius = particleRadius
                 }
 
                 val ax = (fPressureX + fViscosityX) / pi.density + gravityX
@@ -256,9 +266,9 @@ class FluidSimulationEngine(
                 pi.vx += ax * dt
                 pi.vy += ay * dt
 
-                // Low natural drag (0.9982f instead of 0.990f for free real-water momentum)
-                pi.vx *= 0.9982f
-                pi.vy *= 0.9982f
+                // Low natural drag for authentic water momentum
+                pi.vx *= 0.9984f
+                pi.vy *= 0.9984f
 
                 // Velocity clamping
                 var speed = hypot(pi.vx, pi.vy)
@@ -270,11 +280,11 @@ class FluidSimulationEngine(
                 }
 
                 // Calm Resting State Stabilization:
-                // Smoothly damp out micro-tremors only when nearly at rest (< 30 px/s)
-                if (speed < 30f) {
+                // Smoothly damp out micro-tremors only when nearly at rest (< 25 px/s)
+                if (speed < 25f) {
                     pi.vx *= 0.88f
                     pi.vy *= 0.88f
-                    if (speed < 3.0f) {
+                    if (speed < 2.5f) {
                         pi.vx = 0f
                         pi.vy = 0f
                     }
@@ -285,7 +295,7 @@ class FluidSimulationEngine(
 
                 if (pi.isDroplet) {
                     pi.lifetime += dt
-                    if (pi.lifetime > 3.0f && speed < 80f) {
+                    if (pi.lifetime > 2.0f && speed < 120f) {
                         pi.isDroplet = false
                         pi.radius = particleRadius
                     }

@@ -17,7 +17,7 @@ object Shaders {
             vec2 clipSpace = zeroToOne * 2.0 - 1.0;
             // Invert Y so (0,0) in screen coordinates is at the top of the viewport
             gl_Position = vec4(clipSpace.x, -clipSpace.y, 0.0, 1.0);
-            gl_PointSize = a_Radius * 3.6;
+            gl_PointSize = a_Radius * 4.2;
         }
     """.trimIndent()
 
@@ -78,8 +78,8 @@ object Shaders {
             }
 
             // Thresholds for metaball isosurface
-            float liquidThreshold = 0.38;
-            float glowThreshold = 0.06;
+            float liquidThreshold = 0.28;
+            float glowThreshold = 0.05;
 
             if (density < glowThreshold) {
                 // Background
