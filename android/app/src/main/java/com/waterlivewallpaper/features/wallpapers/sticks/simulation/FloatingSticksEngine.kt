@@ -40,16 +40,18 @@ class FloatingSticksEngine(
         clampSticksToScreen()
     }
 
-    fun initializeDefaultSticks(stickCount: Int = 4) {
+    private var currentScale: Float = 1.0f
+
+    fun initializeDefaultSticks(stickCount: Int = 5, scale: Float = 1.0f) {
         synchronized(sticks) {
             sticks.clear()
-            val count = stickCount.coerceIn(2, 6)
-            val spacingX = screenWidth / (count + 1f)
+            currentScale = scale
+            val count = stickCount.coerceIn(2, 15)
+            val cols = kotlin.math.min(count, 4)
 
             for (i in 0 until count) {
                 val texIdx = (i % 6) + 1
-                // Natural variety in stick length and thickness
-                val len = when (texIdx) {
+                val baseLen = when (texIdx) {
                     1 -> 220f
                     2 -> 240f
                     3 -> 200f
@@ -57,25 +59,32 @@ class FloatingSticksEngine(
                     5 -> 210f
                     else -> 190f
                 }
-                val rad = when (texIdx) {
+                val baseRad = when (texIdx) {
                     2 -> 20f
                     4 -> 16f
                     6 -> 14f
                     else -> 18f
                 }
-                val initialX = spacingX * (i + 1) + (Random.nextFloat() - 0.5f) * 40f
-                val initialY = screenHeight * 0.65f + (Random.nextFloat() - 0.5f) * 120f
-                val initialAngle = (Random.nextFloat() - 0.5f) * 0.8f
+
+                val len = baseLen * scale
+                val rad = baseRad * scale
+
+                val col = i % cols
+                val row = i / cols
+                val spacingX = screenWidth / (cols + 1f)
+                val initialX = spacingX * (col + 1f) + (Random.nextFloat() - 0.5f) * 20f
+                val initialY = screenHeight * 0.45f + row * (65f * scale) + (Random.nextFloat() - 0.5f) * 30f
+                val initialAngle = (Random.nextFloat() - 0.5f) * 0.6f
 
                 sticks.add(
                     FloatingStick(
                         id = i + 1,
                         x = initialX,
                         y = initialY,
-                        vx = (Random.nextFloat() - 0.5f) * 10f,
+                        vx = 0f,
                         vy = 0f,
                         angle = initialAngle,
-                        angularVelocity = (Random.nextFloat() - 0.5f) * 0.2f,
+                        angularVelocity = 0f,
                         length = len,
                         radius = rad,
                         woodDensity = 0.65f,
@@ -195,13 +204,26 @@ class FloatingSticksEngine(
                 // Normalize angle
                 if (s.angle > Math.PI) s.angle -= (2 * Math.PI).toFloat()
                 if (s.angle < -Math.PI) s.angle += (2 * Math.PI).toFloat()
-
-                // 4. Boundary collision check
-                handleWallCollisions(s)
             }
 
-            // 5. Stick-to-stick capsule collisions
-            resolveStickCollisions()
+            // Multi-pass constraint solver: guarantees sticks stack on top of each other without tunneling
+            for (iter in 0 until 3) {
+                resolveStickCollisions()
+                for (s in sticks) {
+                    handleWallCollisions(s)
+                }
+            }
+
+            // Resting sleep deadzone: completely eliminates idle vibration when mobile is still
+            for (s in sticks) {
+                val spd2 = s.vx * s.vx + s.vy * s.vy
+                val w2 = s.angularVelocity * s.angularVelocity
+                if (spd2 < 18f && w2 < 0.015f) {
+                    s.vx = 0f
+                    s.vy = 0f
+                    s.angularVelocity = 0f
+                }
+            }
         }
     }
 
@@ -250,18 +272,26 @@ class FloatingSticksEngine(
         if (wallDist < 0f) {
             // Penetration detected!
             val penetration = -wallDist
-            s.x += wallNormalX * penetration * 0.7f
-            s.y += wallNormalY * penetration * 0.7f
+            s.x += wallNormalX * penetration * 0.85f
+            s.y += wallNormalY * penetration * 0.85f
 
             val velDotNormal = s.vx * wallNormalX + s.vy * wallNormalY
             if (velDotNormal < 0f) {
-                // Reflect velocity
-                s.vx -= (1f + wallRestitution) * velDotNormal * wallNormalX
-                s.vy -= (1f + wallRestitution) * velDotNormal * wallNormalY
+                // Zero restitution for resting contact (< 40 px/s) to prevent bouncing
+                val rest = if (kotlin.math.abs(velDotNormal) < 40f) 0.0f else wallRestitution
+                s.vx -= (1f + rest) * velDotNormal * wallNormalX
+                s.vy -= (1f + rest) * velDotNormal * wallNormalY
 
-                // Contact friction exerts rotational torque
+                // Wall friction stops continuous sliding
+                val tanX = -wallNormalY
+                val tanY = wallNormalX
+                val vTan = s.vx * tanX + s.vy * tanY
+                s.vx -= vTan * 0.25f * tanX
+                s.vy -= vTan * 0.25f * tanY
+
                 val torque = rx * wallNormalY - ry * wallNormalX
-                s.angularVelocity += torque * 0.003f
+                s.angularVelocity += torque * 0.002f
+                s.angularVelocity *= 0.85f
             }
         }
     }
@@ -327,7 +357,9 @@ class FloatingSticksEngine(
                     val normalVel = relVx * nx + relVy * ny
 
                     if (normalVel < 0f) {
-                        val impulse = -(1f + stickRestitution) * normalVel / (1f / a.mass + 1f / b.mass)
+                        // Inelastic collision for resting contacts (< 40 px/s) to prevent micro-bounce jitter
+                        val rest = if (kotlin.math.abs(normalVel) < 40f) 0.0f else stickRestitution
+                        val impulse = -(1f + rest) * normalVel / (1f / a.mass + 1f / b.mass)
                         val impX = nx * impulse
                         val impY = ny * impulse
 
@@ -338,6 +370,16 @@ class FloatingSticksEngine(
 
                         a.angularVelocity -= (rAx * impY - rAy * impX) / a.momentOfInertia
                         b.angularVelocity += (rBx * impY - rBy * impX) / b.momentOfInertia
+
+                        // Wood-on-wood tangent friction: allows sticks to grip and stack solidly!
+                        val tanX = -ny
+                        val tanY = nx
+                        val relVTan = relVx * tanX + relVy * tanY
+                        val fImp = relVTan * 0.35f
+                        a.vx += tanX * fImp * 0.5f
+                        a.vy += tanY * fImp * 0.5f
+                        b.vx -= tanX * fImp * 0.5f
+                        b.vy -= tanY * fImp * 0.5f
                     }
                 }
             }

@@ -110,7 +110,7 @@ export default function PreviewScreen() {
             <View style={styles.bottomButtonsRow}>
               <TouchableOpacity
                 style={styles.btnSecondary}
-                onPress={() => router.push('/customize')}
+                onPress={() => router.push({ pathname: '/customize', params: { type: isSticks ? 'sticks' : 'water' } })}
                 activeOpacity={0.8}
               >
                 <Text style={styles.btnSecondaryText}>Customize ⚙</Text>

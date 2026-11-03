@@ -15,6 +15,16 @@ export interface WallpaperSettings {
   targetFps: number; // 30, 60, 90, 120
   touchInteractionsEnabled: boolean;
   sensorPollingRateHz: number; // 30, 60, 100
+
+  // Water Wallpaper specific customization
+  waterLevel?: number; // 0.15 to 0.80 (mapped to water volume)
+  waterSpeed?: number; // 0.5 to 2.5 (fluid responsiveness multiplier)
+
+  // Floating Sticks Wallpaper specific customization
+  stickSize?: number; // 0.6 to 1.6 scale multiplier
+  stickCount?: number; // 2 to 15 twigs
+  stickSpeed?: number; // 0.5 to 2.5 speed multiplier
+  stickBackgroundImageUri?: string | null;
 }
 
 export interface PresetTheme {
@@ -73,6 +83,12 @@ export const DEFAULT_WALLPAPER_SETTINGS: WallpaperSettings = {
   targetFps: 60,
   touchInteractionsEnabled: true,
   sensorPollingRateHz: 60,
+  waterLevel: 0.38,
+  waterSpeed: 1.25,
+  stickSize: 1.0,
+  stickCount: 5,
+  stickSpeed: 1.0,
+  stickBackgroundImageUri: null,
 };
 
 export const PRESET_THEMES: PresetTheme[] = [

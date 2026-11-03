@@ -27,6 +27,10 @@ class WallpaperPreferences(context: Context) {
         const val KEY_CUSTOM_IMAGE_PATH = "custom_image_path"
         const val KEY_CUSTOM_IMAGE_ENABLED = "custom_image_enabled"
 
+        const val KEY_STICK_SIZE = "stick_size"
+        const val KEY_STICK_COUNT = "stick_count"
+        const val KEY_STICK_SPEED = "stick_speed"
+
         const val QUALITY_BATTERY_SAVER = "battery_saver"
         const val QUALITY_BALANCED = "balanced"
         const val QUALITY_PERFORMANCE = "performance"
@@ -44,6 +48,9 @@ class WallpaperPreferences(context: Context) {
         const val DEFAULT_QUALITY_LEVEL = "balanced"
         const val DEFAULT_TARGET_FPS = 30 // Balanced 30 FPS target for optimal battery & smoothness
         const val DEFAULT_TOUCH_ENABLED = true
+        const val DEFAULT_STICK_SIZE = 1.0f
+        const val DEFAULT_STICK_COUNT = 5
+        const val DEFAULT_STICK_SPEED = 1.0f
     }
 
     @Volatile private var cachedWaterColorInt: Int = 0
@@ -186,6 +193,10 @@ class WallpaperPreferences(context: Context) {
 
     fun isTouchEnabled(): Boolean = prefs.getBoolean(KEY_TOUCH_ENABLED, DEFAULT_TOUCH_ENABLED)
 
+    fun getStickSize(): Float = prefs.getFloat(KEY_STICK_SIZE, DEFAULT_STICK_SIZE)
+    fun getStickCount(): Int = prefs.getInt(KEY_STICK_COUNT, DEFAULT_STICK_COUNT)
+    fun getStickSpeed(): Float = prefs.getFloat(KEY_STICK_SPEED, DEFAULT_STICK_SPEED)
+
     fun getCustomImagePath(): String? {
         val enabled = prefs.getBoolean(KEY_CUSTOM_IMAGE_ENABLED, false)
         if (!enabled) return null
@@ -224,6 +235,11 @@ class WallpaperPreferences(context: Context) {
             if (json.has("qualityLevel")) editor.putString(KEY_QUALITY_LEVEL, json.getString("qualityLevel"))
             if (json.has("targetFps")) editor.putInt(KEY_TARGET_FPS, json.getInt("targetFps"))
             if (json.has("touchInteractionsEnabled")) editor.putBoolean(KEY_TOUCH_ENABLED, json.getBoolean("touchInteractionsEnabled"))
+            if (json.has("stickSize")) editor.putFloat(KEY_STICK_SIZE, json.getDouble("stickSize").toFloat())
+            if (json.has("stickCount")) editor.putInt(KEY_STICK_COUNT, json.getInt("stickCount"))
+            if (json.has("stickSpeed")) editor.putFloat(KEY_STICK_SPEED, json.getDouble("stickSpeed").toFloat())
+            if (json.has("waterLevel")) editor.putFloat(KEY_WATER_VOLUME, json.getDouble("waterLevel").toFloat())
+            if (json.has("waterSpeed")) editor.putFloat(KEY_PHYSICS_SENSITIVITY, json.getDouble("waterSpeed").toFloat())
             if (json.has("customImagePath")) {
                 val path = if (json.isNull("customImagePath")) null else json.getString("customImagePath")
                 if (path != null) {
@@ -269,6 +285,11 @@ class WallpaperPreferences(context: Context) {
         json.put("qualityLevel", getQualityLevel())
         json.put("targetFps", getTargetFps())
         json.put("touchInteractionsEnabled", isTouchEnabled())
+        json.put("stickSize", getStickSize().toDouble())
+        json.put("stickCount", getStickCount())
+        json.put("stickSpeed", getStickSpeed().toDouble())
+        json.put("waterLevel", getWaterVolume().toDouble())
+        json.put("waterSpeed", getPhysicsSensitivity().toDouble())
         return json.toString()
     }
 

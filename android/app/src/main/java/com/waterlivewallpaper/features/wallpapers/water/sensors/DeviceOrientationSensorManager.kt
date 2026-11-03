@@ -31,6 +31,10 @@ class DeviceOrientationSensorManager(
     private var lastCallbackGx = 0f
     private var lastCallbackGy = 0f
 
+    private var lastShakeTimeNs: Long = 0L
+    private val shakeThresholdSq = 11.0f * 11.0f // Require vigorous shake gesture (> 11 m/s²)
+    private val shakeCooldownNs = 320_000_000L   // 320ms cooldown between splashes
+
     fun start(samplingPeriodUs: Int = 33_333) { // ~30 Hz: Optimal battery efficiency & silky fluid tracking
         if (gravitySensor != null) {
             sensorManager.registerListener(this, gravitySensor, samplingPeriodUs)
@@ -99,12 +103,13 @@ class DeviceOrientationSensorManager(
                 smoothGx = alpha * smoothGx + (1f - alpha) * targetGx
                 smoothGy = alpha * smoothGy + (1f - alpha) * targetGy
 
-                if (abs(smoothGx) < 0.04f) smoothGx = 0f
+                if (abs(smoothGx) < 0.12f) smoothGx = 0f
+                if (abs(smoothGy - 9.8f) < 0.12f) smoothGy = 9.8f
 
-                // Avoid redundant callback executions if gravity hasn't visibly changed (< 0.02 m/s²)
+                // Avoid redundant callback executions if gravity hasn't visibly changed (< 0.06 m/s²)
                 val cbDiffX = smoothGx - lastCallbackGx
                 val cbDiffY = smoothGy - lastCallbackGy
-                if (cbDiffX * cbDiffX + cbDiffY * cbDiffY > 0.0004f) {
+                if (cbDiffX * cbDiffX + cbDiffY * cbDiffY > 0.0036f) {
                     lastCallbackGx = smoothGx
                     lastCallbackGy = smoothGy
                     onOrientationUpdate(smoothGx, smoothGy, false, 0f, 0f)
@@ -117,8 +122,9 @@ class DeviceOrientationSensorManager(
                 val lz = event.values[2]
                 val linMag2 = lx * lx + ly * ly + lz * lz
 
-                // Hand tremor deadzone: ignore subtle resting tremor (< 0.6 m/s² => 0.36)
-                if (linMag2 > 0.36f) {
+                val nowNs = System.nanoTime()
+                if (linMag2 >= shakeThresholdSq && (nowNs - lastShakeTimeNs >= shakeCooldownNs)) {
+                    lastShakeTimeNs = nowNs
                     var screenLinX = -lx
                     var screenLinY = ly
 
@@ -174,9 +180,12 @@ class DeviceOrientationSensorManager(
                     smoothGx = 0.85f * smoothGx + 0.15f * targetGx
                     smoothGy = 0.85f * smoothGy + 0.15f * targetGy
 
+                    if (abs(smoothGx) < 0.12f) smoothGx = 0f
+                    if (abs(smoothGy - 9.8f) < 0.12f) smoothGy = 9.8f
+
                     val cbDiffX = smoothGx - lastCallbackGx
                     val cbDiffY = smoothGy - lastCallbackGy
-                    if (cbDiffX * cbDiffX + cbDiffY * cbDiffY > 0.0004f) {
+                    if (cbDiffX * cbDiffX + cbDiffY * cbDiffY > 0.0036f) {
                         lastCallbackGx = smoothGx
                         lastCallbackGy = smoothGy
                         onOrientationUpdate(smoothGx, smoothGy, false, 0f, 0f)
@@ -189,7 +198,9 @@ class DeviceOrientationSensorManager(
                     val day = ay - smoothGy
                     val dynMag2 = dax * dax + day * day
 
-                    if (dynMag2 > 0.64f) {
+                    val nowNs = System.nanoTime()
+                    if (dynMag2 >= shakeThresholdSq && (nowNs - lastShakeTimeNs >= shakeCooldownNs)) {
+                        lastShakeTimeNs = nowNs
                         var screenLinX = -dax
                         var screenLinY = day
 

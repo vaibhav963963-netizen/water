@@ -46,10 +46,13 @@ export class FloatingSticksEngine {
   private readonly buoyancyCoeff = 1.35;
   private readonly fluidDragCoeff = 2.80;
 
-  constructor(width: number, height: number, stickCount: number = 4) {
+  private stickScale: number = 1.0;
+
+  constructor(width: number, height: number, stickCount: number = 5, scale: number = 1.0) {
     this.width = width;
     this.height = height;
-    this.initializeDefaultSticks(stickCount);
+    this.stickScale = scale;
+    this.initializeDefaultSticks(stickCount, scale);
   }
 
   public setDimensions(width: number, height: number): void {
@@ -58,27 +61,43 @@ export class FloatingSticksEngine {
     this.clampSticksToScreen();
   }
 
-  public initializeDefaultSticks(count: number = 4): void {
+  public setConfig(count: number, scale: number): void {
+    if (this.sticks.length !== count || Math.abs(this.stickScale - scale) > 0.05) {
+      this.stickScale = scale;
+      this.initializeDefaultSticks(count, scale);
+    }
+  }
+
+  public initializeDefaultSticks(count: number = 5, scale: number = 1.0): void {
     this.sticks = [];
-    const clampedCount = Math.max(2, Math.min(6, count));
-    const spacingX = this.width / (clampedCount + 1);
+    this.stickScale = scale;
+    const clampedCount = Math.max(2, Math.min(15, count));
+    const cols = Math.min(clampedCount, 4);
 
     for (let i = 0; i < clampedCount; i++) {
+      // Pick twig texture cyclically/randomly across available 6 textures
       const texIdx = (i % 6) + 1;
-      const len = texIdx === 1 ? 220 : texIdx === 2 ? 240 : texIdx === 3 ? 200 : texIdx === 4 ? 230 : texIdx === 5 ? 210 : 190;
-      const rad = texIdx === 2 ? 20 : texIdx === 4 ? 16 : texIdx === 6 ? 14 : 18;
+      const baseLen = texIdx === 1 ? 220 : texIdx === 2 ? 240 : texIdx === 3 ? 200 : texIdx === 4 ? 230 : texIdx === 5 ? 210 : 190;
+      const baseRad = texIdx === 2 ? 20 : texIdx === 4 ? 16 : texIdx === 6 ? 14 : 18;
+
+      const len = baseLen * scale;
+      const rad = baseRad * scale;
       const woodDensity = 0.65;
       const mass = Math.max(1, len * rad * 2 * woodDensity * 0.05);
       const momentOfInertia = Math.max(10, (1 / 12) * mass * (len * len + 4 * rad * rad));
 
+      const col = i % cols;
+      const row = Math.floor(i / cols);
+      const spacingX = this.width / (cols + 1);
+
       this.sticks.push({
         id: i + 1,
-        x: spacingX * (i + 1) + (Math.random() - 0.5) * 30,
-        y: this.height * 0.65 + (Math.random() - 0.5) * 80,
-        vx: (Math.random() - 0.5) * 10,
+        x: spacingX * (col + 1) + (Math.random() - 0.5) * 20,
+        y: this.height * 0.45 + row * 65 + (Math.random() - 0.5) * 30,
+        vx: 0,
         vy: 0,
-        angle: (Math.random() - 0.5) * 0.8,
-        angularVelocity: (Math.random() - 0.5) * 0.2,
+        angle: (Math.random() - 0.5) * 0.6,
+        angularVelocity: 0,
         length: len,
         radius: rad,
         woodDensity,
@@ -170,11 +189,27 @@ export class FloatingSticksEngine {
       s.angle += s.angularVelocity * dt;
       if (s.angle > Math.PI) s.angle -= 2 * Math.PI;
       if (s.angle < -Math.PI) s.angle += 2 * Math.PI;
-
-      this.handleWallCollisions(s);
     }
 
-    this.resolveStickCollisions();
+    // Multi-pass constraint solver: guarantees sticks stack on top of each other without tunneling
+    for (let iter = 0; iter < 3; iter++) {
+      this.resolveStickCollisions();
+      for (let i = 0; i < this.sticks.length; i++) {
+        this.handleWallCollisions(this.sticks[i]);
+      }
+    }
+
+    // Resting sleep deadzone: completely eliminates idle vibration when mobile is still
+    for (let i = 0; i < this.sticks.length; i++) {
+      const s = this.sticks[i];
+      const spd2 = s.vx * s.vx + s.vy * s.vy;
+      const w2 = s.angularVelocity * s.angularVelocity;
+      if (spd2 < 18 && w2 < 0.015) {
+        s.vx = 0;
+        s.vy = 0;
+        s.angularVelocity = 0;
+      }
+    }
   }
 
   private getSamplePoints(s: FloatingStick, numPoints: number = 5): [number, number, number, number][] {
@@ -234,16 +269,26 @@ export class FloatingSticksEngine {
   ): void {
     if (dist < 0) {
       const penetration = -dist;
-      s.x += normalX * penetration * 0.7;
-      s.y += normalY * penetration * 0.7;
+      s.x += normalX * penetration * 0.85;
+      s.y += normalY * penetration * 0.85;
 
       const velDotNormal = s.vx * normalX + s.vy * normalY;
       if (velDotNormal < 0) {
-        s.vx -= (1 + this.wallRestitution) * velDotNormal * normalX;
-        s.vy -= (1 + this.wallRestitution) * velDotNormal * normalY;
+        // Zero restitution for resting contact (< 40 px/s) to prevent bouncing
+        const rest = Math.abs(velDotNormal) < 40 ? 0.0 : this.wallRestitution;
+        s.vx -= (1 + rest) * velDotNormal * normalX;
+        s.vy -= (1 + rest) * velDotNormal * normalY;
+
+        // Wall friction stops continuous sliding
+        const tanX = -normalY;
+        const tanY = normalX;
+        const vTan = s.vx * tanX + s.vy * tanY;
+        s.vx -= vTan * 0.25 * tanX;
+        s.vy -= vTan * 0.25 * tanY;
 
         const torque = rx * normalY - ry * normalX;
-        s.angularVelocity += torque * 0.003;
+        s.angularVelocity += torque * 0.002;
+        s.angularVelocity *= 0.85;
       }
     }
   }
@@ -292,10 +337,12 @@ export class FloatingSticksEngine {
           const nx = cDx / dist;
           const ny = cDy / dist;
 
-          a.x -= nx * overlap * 0.5;
-          a.y -= ny * overlap * 0.5;
-          b.x += nx * overlap * 0.5;
-          b.y += ny * overlap * 0.5;
+          // Push overlapping sticks apart (Position-Based Dynamics relaxation)
+          const pushFraction = 0.5;
+          a.x -= nx * overlap * pushFraction;
+          a.y -= ny * overlap * pushFraction;
+          b.x += nx * overlap * pushFraction;
+          b.y += ny * overlap * pushFraction;
 
           const rAx = closest[0] - a.x;
           const rAy = closest[1] - a.y;
@@ -312,7 +359,9 @@ export class FloatingSticksEngine {
           const normalVel = relVx * nx + relVy * ny;
 
           if (normalVel < 0) {
-            const impulse = -(1 + this.stickRestitution) * normalVel / (1 / a.mass + 1 / b.mass);
+            // Inelastic collision for resting contacts (< 40 px/s) to prevent micro-bounce jitter
+            const rest = Math.abs(normalVel) < 40 ? 0.0 : this.stickRestitution;
+            const impulse = -(1 + rest) * normalVel / (1 / a.mass + 1 / b.mass);
             const impX = nx * impulse;
             const impY = ny * impulse;
 
@@ -323,6 +372,16 @@ export class FloatingSticksEngine {
 
             a.angularVelocity -= (rAx * impY - rAy * impX) / a.momentOfInertia;
             b.angularVelocity += (rBx * impY - rBy * impX) / b.momentOfInertia;
+
+            // Wood-on-wood tangent friction: allows sticks to grip and stack solidly!
+            const tanX = -ny;
+            const tanY = nx;
+            const relVTan = relVx * tanX + relVy * tanY;
+            const fImp = relVTan * 0.35;
+            a.vx += tanX * fImp * 0.5;
+            a.vy += tanY * fImp * 0.5;
+            b.vx -= tanX * fImp * 0.5;
+            b.vy -= tanY * fImp * 0.5;
           }
         }
       }

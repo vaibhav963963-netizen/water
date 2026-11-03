@@ -339,7 +339,7 @@ export default function AppEntry() {
         <View style={styles.cardActionsRow}>
           <TouchableOpacity
             style={styles.btnSecondary}
-            onPress={() => router.push('/customize')}
+            onPress={() => router.push({ pathname: '/customize', params: { type: 'water' } })}
             activeOpacity={0.8}
           >
             <Text style={styles.btnSecondaryText}>Customize ⚙</Text>
@@ -401,7 +401,7 @@ export default function AppEntry() {
         <View style={styles.cardActionsRow}>
           <TouchableOpacity
             style={styles.btnSecondary}
-            onPress={() => router.push('/customize')}
+            onPress={() => router.push({ pathname: '/customize', params: { type: 'sticks' } })}
             activeOpacity={0.8}
           >
             <Text style={styles.btnSecondaryText}>Customize ⚙</Text>

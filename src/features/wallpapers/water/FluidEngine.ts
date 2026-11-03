@@ -220,12 +220,20 @@ export class FluidEngine {
       pi.vx *= 0.996;
       pi.vy *= 0.996;
 
-      // Clamp max velocity
+      // Clamp max velocity & calm resting deadzone
       const currentSpeed = Math.hypot(pi.vx, pi.vy);
       if (currentSpeed > this.maxVelocity) {
         const ratio = this.maxVelocity / currentSpeed;
         pi.vx *= ratio;
         pi.vy *= ratio;
+      } else if (currentSpeed < 22) {
+        // Natural settling damping: completely removes idle vibration when phone is still
+        pi.vx *= 0.88;
+        pi.vy *= 0.88;
+        if (currentSpeed < 2.5) {
+          pi.vx = 0;
+          pi.vy = 0;
+        }
       }
 
       pi.x += pi.vx * clampedDt;

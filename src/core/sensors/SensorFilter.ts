@@ -88,6 +88,12 @@ export class SensorFilter {
       this.gravityZ * this.gravityZ
     );
 
+    // Snap near-zero X gravity to 0 and upright Y to 9.8 to eliminate resting hand tremor
+    let cleanGx = this.gravityX;
+    let cleanGy = this.gravityY;
+    if (Math.abs(cleanGx) < 0.15) cleanGx = 0;
+    if (Math.abs(cleanGy - 9.8) < 0.20) cleanGy = 9.8;
+
     const nx = norm > 0.0001 ? this.gravityX / norm : 0;
     const ny = norm > 0.0001 ? this.gravityY / norm : 0;
     const nz = norm > 0.0001 ? this.gravityZ / norm : 1;
@@ -96,8 +102,8 @@ export class SensorFilter {
     const roll = Math.atan2(nx, nz);
 
     return {
-      gravityX: this.gravityX,
-      gravityY: this.gravityY,
+      gravityX: cleanGx,
+      gravityY: cleanGy,
       gravityZ: this.gravityZ,
       pitch,
       roll,

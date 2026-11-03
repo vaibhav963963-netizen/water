@@ -56,6 +56,8 @@ object Shaders {
         uniform sampler2D u_DensityTexture;
         uniform sampler2D u_BackgroundTexture;
         uniform int u_HasCustomBackground;
+        uniform vec2 u_ScreenResolution;
+        uniform vec2 u_BgResolution;
         uniform vec4 u_WaterColor;
         uniform vec4 u_SecondaryColor;
         uniform vec4 u_BackgroundColor;
@@ -68,10 +70,20 @@ object Shaders {
             vec2 uv = v_TexCoord;
             float density = texture2D(u_DensityTexture, uv).r;
 
-            // Resolve background color: either custom bitmap texture (with inverted Y for Bitmap orientation) or solid background color
+            // Resolve background color: either custom bitmap texture (center-cropped to prevent stretching) or solid background color
             vec4 bgColor;
             if (u_HasCustomBackground == 1) {
-                bgColor = texture2D(u_BackgroundTexture, vec2(uv.x, 1.0 - uv.y));
+                vec2 rawUv = vec2(uv.x, 1.0 - uv.y);
+                float screenAR = u_ScreenResolution.x / max(u_ScreenResolution.y, 1.0);
+                float bgAR = u_BgResolution.x / max(u_BgResolution.y, 1.0);
+                float r = screenAR / bgAR;
+                vec2 bgUv;
+                if (r > 1.0) {
+                    bgUv = vec2(rawUv.x, 0.5 + (rawUv.y - 0.5) / r);
+                } else {
+                    bgUv = vec2(0.5 + (rawUv.x - 0.5) * r, rawUv.y);
+                }
+                bgColor = texture2D(u_BackgroundTexture, bgUv);
             } else {
                 bgColor = u_BackgroundColor;
             }

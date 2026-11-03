@@ -54,18 +54,36 @@ export const SticksSimulationView: React.FC<SticksSimulationViewProps> = ({
   const ripplesRef = useRef<Ripple[]>([]);
   const rippleIdCounter = useRef(0);
 
+  const gravityRef = useRef<{ gx: number; gy: number }>({ gx: 0, gy: 980 });
+
   const handleLayout = (e: LayoutChangeEvent) => {
     const { width, height } = e.nativeEvent.layout;
     if (width > 0 && height > 0) {
       setDimensions({ width, height });
       if (!sticksEngineRef.current) {
-        sticksEngineRef.current = new FloatingSticksEngine(width, height, 5);
+        sticksEngineRef.current = new FloatingSticksEngine(
+          width,
+          height,
+          settings.stickCount ?? 5,
+          settings.stickSize ?? 1.0
+        );
         setSticks([...sticksEngineRef.current.getSticks()]);
       } else {
         sticksEngineRef.current.setDimensions(width, height);
       }
     }
   };
+
+  // Re-sync sticks when count or size changes in customization
+  useEffect(() => {
+    if (sticksEngineRef.current && dimensions.width > 0) {
+      sticksEngineRef.current.setConfig(
+        settings.stickCount ?? 5,
+        settings.stickSize ?? 1.0
+      );
+      setSticks([...sticksEngineRef.current.getSticks()]);
+    }
+  }, [settings.stickCount, settings.stickSize, dimensions.width, dimensions.height]);
 
   const spawnRipple = (x: number, y: number) => {
     rippleIdCounter.current++;
@@ -81,7 +99,7 @@ export const SticksSimulationView: React.FC<SticksSimulationViewProps> = ({
     }
   };
 
-  // Sensor Listener
+  // Sensor Listener: Only updates target gravity vector and handles shake impulse (ZERO step calls here!)
   useEffect(() => {
     if (!enableSensors) return;
 
@@ -95,19 +113,17 @@ export const SticksSimulationView: React.FC<SticksSimulationViewProps> = ({
           0
         );
 
-        // Update gravity direction
-        const gx = filtered.gravityX * 120 * settings.physicsSensitivity;
-        const gy = filtered.gravityY * 120 * settings.physicsSensitivity;
+        // Update smoothed gravity direction with deadzone to eliminate idle tremor
+        const speedMultiplier = settings.stickSpeed ?? 1.0;
+        let gx = filtered.gravityX * 100 * speedMultiplier;
+        let gy = filtered.gravityY * 100 * speedMultiplier;
+        if (Math.abs(gx) < 14) gx = 0;
+        if (Math.abs(gy - 980 * speedMultiplier) < 22) gy = 980 * speedMultiplier;
 
-        const fakeFluid = {
-          getGravityX: () => gx,
-          getGravityY: () => gy,
-          sampleFluidAt: () => ({ density: 0, velocityX: 0, velocityY: 0, isSubmerged: false }),
-        };
-        sticksEngineRef.current.step(0.001, fakeFluid as any);
+        gravityRef.current = { gx, gy };
 
         if (filtered.isShakeTriggered) {
-          const impulse = filtered.shakeMagnitude * 35 * settings.shakeSensitivity;
+          const impulse = filtered.shakeMagnitude * 35 * (settings.shakeSensitivity ?? 1.0);
           sticksEngineRef.current.applyShakeImpulse(
             (Math.random() - 0.5) * impulse,
             -impulse * 0.8
@@ -121,7 +137,7 @@ export const SticksSimulationView: React.FC<SticksSimulationViewProps> = ({
     return () => {
       subscription?.remove();
     };
-  }, [enableSensors, settings.physicsSensitivity, settings.shakeSensitivity, settings.sensorPollingRateHz]);
+  }, [enableSensors, settings.stickSpeed, settings.shakeSensitivity, settings.sensorPollingRateHz]);
 
   // Main Animation Loop
   useEffect(() => {
@@ -130,17 +146,20 @@ export const SticksSimulationView: React.FC<SticksSimulationViewProps> = ({
 
     const loop = () => {
       const now = Date.now();
-      const dt = Math.min(0.04, Math.max(0.008, (now - lastTimeRef.current) / 1000));
+      const dt = Math.min(0.033, Math.max(0.008, (now - lastTimeRef.current) / 1000));
       lastTimeRef.current = now;
 
       if (sticksEngineRef.current) {
-        // Step sticks physics (real-world gravity, inertia, collisions, wall bouncing)
-        const dummyFluid = {
-          getGravityX: () => 0,
-          getGravityY: () => 980 * settings.physicsSensitivity,
+        // Step sticks physics with single coherent gravity vector
+        const currentGrav = gravityRef.current;
+        const speed = settings.stickSpeed ?? 1.0;
+        const fluidProxy = {
+          getGravityX: () => currentGrav.gx,
+          getGravityY: () => currentGrav.gy,
           sampleFluidAt: () => ({ density: 0, velocityX: 0, velocityY: 0, isSubmerged: false }),
         };
-        sticksEngineRef.current.step(dt, dummyFluid as any);
+
+        sticksEngineRef.current.step(dt * speed, fluidProxy as any);
         setSticks([...sticksEngineRef.current.getSticks()]);
 
         // Update expanding ripples
@@ -182,7 +201,7 @@ export const SticksSimulationView: React.FC<SticksSimulationViewProps> = ({
         cancelAnimationFrame(animationFrameRef.current);
       }
     };
-  }, [onStatsUpdate, settings.physicsSensitivity]);
+  }, [onStatsUpdate, settings.stickSpeed]);
 
   const panResponder = useRef(
     PanResponder.create({

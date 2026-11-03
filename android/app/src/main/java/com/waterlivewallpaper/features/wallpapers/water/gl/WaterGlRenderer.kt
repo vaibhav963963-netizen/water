@@ -53,6 +53,8 @@ class WaterGlRenderer(
 
     // Custom background texture
     private var bgTextureId = 0
+    private var bgWidth = 0
+    private var bgHeight = 0
     private var currentBgPath: String? = null
 
     // Fullscreen quad buffer [-1,-1, 1,-1, -1,1, 1,1]
@@ -257,6 +259,8 @@ class WaterGlRenderer(
                     }
                     val bitmap = android.graphics.BitmapFactory.decodeFile(path, decodeOpt)
                     if (bitmap != null) {
+                        bgWidth = bitmap.width
+                        bgHeight = bitmap.height
                         val textures = IntArray(1)
                         GLES20.glGenTextures(1, textures, 0)
                         bgTextureId = textures[0]
@@ -283,6 +287,8 @@ class WaterGlRenderer(
             val textures = intArrayOf(bgTextureId)
             GLES20.glDeleteTextures(1, textures, 0)
             bgTextureId = 0
+            bgWidth = 0
+            bgHeight = 0
         }
     }
 
@@ -344,6 +350,8 @@ class WaterGlRenderer(
             GLES20.glBindTexture(GLES20.GL_TEXTURE_2D, bgTextureId)
             GLES20.glUniform1i(shaderProgram.uIsoBackgroundTextureLoc, 1)
             GLES20.glUniform1i(shaderProgram.uIsoHasCustomBgLoc, 1)
+            GLES20.glUniform2f(shaderProgram.uIsoScreenResLoc, width.toFloat(), height.toFloat())
+            GLES20.glUniform2f(shaderProgram.uIsoBgResLoc, bgWidth.toFloat(), bgHeight.toFloat())
         } else {
             GLES20.glUniform1i(shaderProgram.uIsoHasCustomBgLoc, 0)
         }

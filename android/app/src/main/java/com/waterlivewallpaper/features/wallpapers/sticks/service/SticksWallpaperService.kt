@@ -52,6 +52,10 @@ open class SticksWallpaperService : WallpaperService() {
                 screenWidth = 1080,
                 screenHeight = 2400
             )
+            sticksEngine.initializeDefaultSticks(
+                stickCount = preferences.getStickCount(),
+                scale = preferences.getStickSize()
+            )
 
             sensorManager = DeviceOrientationSensorManager(this@SticksWallpaperService) { gx, gy, isShake, impX, impY ->
                 simulationEngine.updateGravity(gx, gy)
@@ -132,6 +136,10 @@ open class SticksWallpaperService : WallpaperService() {
                 shakeSens = preferences.getShakeSensitivity(),
                 speed = preferences.getFlowSpeed(),
                 batterySaver = preferences.isBatterySaver()
+            )
+            sticksEngine.initializeDefaultSticks(
+                stickCount = preferences.getStickCount(),
+                scale = preferences.getStickSize()
             )
         }
 
