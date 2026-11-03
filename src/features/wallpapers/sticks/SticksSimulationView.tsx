@@ -113,12 +113,12 @@ export const SticksSimulationView: React.FC<SticksSimulationViewProps> = ({
           0
         );
 
-        // Update smoothed gravity direction with deadzone to eliminate idle tremor
+        // Realistic calibrated gravity for natural wood sliding & settling
         const speedMultiplier = settings.stickSpeed ?? 1.0;
-        let gx = filtered.gravityX * 100 * speedMultiplier;
-        let gy = filtered.gravityY * 100 * speedMultiplier;
-        if (Math.abs(gx) < 14) gx = 0;
-        if (Math.abs(gy - 980 * speedMultiplier) < 22) gy = 980 * speedMultiplier;
+        let gx = filtered.gravityX * 42 * speedMultiplier;
+        let gy = filtered.gravityY * 42 * speedMultiplier;
+        if (Math.abs(gx) < 18) gx = 0;
+        if (Math.abs(gy - 410 * speedMultiplier) < 35) gy = 410 * speedMultiplier;
 
         gravityRef.current = { gx, gy };
 

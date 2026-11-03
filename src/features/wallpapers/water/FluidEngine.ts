@@ -266,18 +266,18 @@ export class FluidEngine {
 
     if (p.x < r) {
       p.x = r;
-      p.vx = -p.vx * damping;
+      p.vx = Math.abs(p.vx) < 20 ? 0 : -p.vx * damping;
     } else if (p.x > this.width - r) {
       p.x = this.width - r;
-      p.vx = -p.vx * damping;
+      p.vx = Math.abs(p.vx) < 20 ? 0 : -p.vx * damping;
     }
 
     if (p.y < r) {
       p.y = r;
-      p.vy = -p.vy * damping;
+      p.vy = Math.abs(p.vy) < 20 ? 0 : -p.vy * damping;
     } else if (p.y > this.height - r) {
       p.y = this.height - r;
-      p.vy = -p.vy * damping;
+      p.vy = Math.abs(p.vy) < 20 ? 0 : -p.vy * damping;
     }
   }
 

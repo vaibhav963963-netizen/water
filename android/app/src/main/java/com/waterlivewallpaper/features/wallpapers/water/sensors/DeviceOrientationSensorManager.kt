@@ -103,13 +103,20 @@ class DeviceOrientationSensorManager(
                 smoothGx = alpha * smoothGx + (1f - alpha) * targetGx
                 smoothGy = alpha * smoothGy + (1f - alpha) * targetGy
 
-                if (abs(smoothGx) < 0.12f) smoothGx = 0f
-                if (abs(smoothGy - 9.8f) < 0.12f) smoothGy = 9.8f
+                // Enhanced deadzone for physiological hand tremor (< 0.45 m/s² ~ 2.6 deg)
+                if (abs(smoothGx) < 0.45f) smoothGx = 0f
+                if (targetGy > 3.5f && smoothGx == 0f) {
+                    smoothGy = 9.8f
+                } else if (abs(smoothGy - 9.8f) < 0.35f) {
+                    smoothGy = 9.8f
+                }
 
-                // Avoid redundant callback executions if gravity hasn't visibly changed (< 0.06 m/s²)
+                // Deliver updates if gravity changed or if it just snapped back to 0 at rest
                 val cbDiffX = smoothGx - lastCallbackGx
                 val cbDiffY = smoothGy - lastCallbackGy
-                if (cbDiffX * cbDiffX + cbDiffY * cbDiffY > 0.0036f) {
+                val shouldUpdate = (cbDiffX * cbDiffX + cbDiffY * cbDiffY > 0.0064f) || 
+                                   (smoothGx == 0f && lastCallbackGx != 0f)
+                if (shouldUpdate) {
                     lastCallbackGx = smoothGx
                     lastCallbackGy = smoothGy
                     onOrientationUpdate(smoothGx, smoothGy, false, 0f, 0f)
@@ -180,12 +187,18 @@ class DeviceOrientationSensorManager(
                     smoothGx = 0.85f * smoothGx + 0.15f * targetGx
                     smoothGy = 0.85f * smoothGy + 0.15f * targetGy
 
-                    if (abs(smoothGx) < 0.12f) smoothGx = 0f
-                    if (abs(smoothGy - 9.8f) < 0.12f) smoothGy = 9.8f
+                    if (abs(smoothGx) < 0.45f) smoothGx = 0f
+                    if (targetGy > 3.5f && smoothGx == 0f) {
+                        smoothGy = 9.8f
+                    } else if (abs(smoothGy - 9.8f) < 0.35f) {
+                        smoothGy = 9.8f
+                    }
 
                     val cbDiffX = smoothGx - lastCallbackGx
                     val cbDiffY = smoothGy - lastCallbackGy
-                    if (cbDiffX * cbDiffX + cbDiffY * cbDiffY > 0.0036f) {
+                    val shouldUpdate = (cbDiffX * cbDiffX + cbDiffY * cbDiffY > 0.0064f) || 
+                                       (smoothGx == 0f && lastCallbackGx != 0f)
+                    if (shouldUpdate) {
                         lastCallbackGx = smoothGx
                         lastCallbackGy = smoothGy
                         onOrientationUpdate(smoothGx, smoothGy, false, 0f, 0f)

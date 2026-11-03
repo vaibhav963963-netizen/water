@@ -308,7 +308,7 @@ class FluidSimulationEngine(
                 pi.vx *= 0.9984f
                 pi.vy *= 0.9984f
 
-                // Velocity clamping & calming (using squared speed comparison)
+                // Velocity damping & settling
                 val v2 = pi.vx * pi.vx + pi.vy * pi.vy
                 if (v2 > maxV2InStep) maxV2InStep = v2
 
@@ -317,10 +317,17 @@ class FluidSimulationEngine(
                     val ratio = maxVelocity / speed
                     pi.vx *= ratio
                     pi.vy *= ratio
+                } else if (gravityX == 0f && v2 < 2025f) { // speed < 45 px/s in stable mobile
+                    pi.vx *= 0.82f
+                    pi.vy *= 0.82f
+                    if (v2 < 25f) { // speed < 5 px/s
+                        pi.vx = 0f
+                        pi.vy = 0f
+                    }
                 } else if (v2 < 625f) { // speed < 25 px/s
-                    pi.vx *= 0.88f
-                    pi.vy *= 0.88f
-                    if (v2 < 6.25f) { // speed < 2.5 px/s
+                    pi.vx *= 0.90f
+                    pi.vy *= 0.90f
+                    if (v2 < 6.25f) {
                         pi.vx = 0f
                         pi.vy = 0f
                     }
@@ -347,49 +354,48 @@ class FluidSimulationEngine(
                 calmDuration = 0f
             }
 
-            // 3. HARD-CORE INCOMPRESSIBILITY CONSTRAINT (Position-Based Dynamics):
-            // Prevents particles from merging or collapsing on top of each other!
-            // When water pools in a corner, each particle maintains its physical volume,
-            // forming a massive, deep liquid pool that never shrinks!
-            val hardCoreDist = particleRadius * 1.82f
+            // 3. True Anti-Penetration Hard Core Constraint (fires ONLY on severe overlap, NOT on resting fluid)
+            val hardCoreDist = particleRadius * 1.15f
             val hardCoreDist2 = hardCoreDist * hardCoreDist
 
-            for (iter in 0 until 2) {
-                for (i in 0 until count) {
-                    val pi = particles[i]
-                    for (j in i + 1 until count) {
-                        val pj = particles[j]
-                        val dx = pj.x - pi.x
-                        val dy = pj.y - pi.y
-                        val r2 = dx * dx + dy * dy
+            if (maxVelocityObserved > 4f || gravityX != 0f) {
+                for (iter in 0 until 2) {
+                    for (i in 0 until count) {
+                        val pi = particles[i]
+                        for (j in i + 1 until count) {
+                            val pj = particles[j]
+                            val dx = pj.x - pi.x
+                            val dy = pj.y - pi.y
+                            val r2 = dx * dx + dy * dy
 
-                        if (r2 < hardCoreDist2 && r2 > 0.0001f) {
-                            val r = kotlin.math.sqrt(r2)
-                            val overlap = hardCoreDist - r
-                            val normX = dx / r
-                            val normY = dy / r
+                            if (r2 < hardCoreDist2 && r2 > 0.0001f) {
+                                val r = kotlin.math.sqrt(r2)
+                                val overlap = hardCoreDist - r
+                                val normX = dx / r
+                                val normY = dy / r
 
-                            // Relax particles apart along collision normal
-                            val correction = overlap * 0.5f
-                            pi.x -= normX * correction
-                            pi.y -= normY * correction
-                            pj.x += normX * correction
-                            pj.y += normY * correction
+                                // Relax particles apart along collision normal
+                                val correction = overlap * 0.5f
+                                pi.x -= normX * correction
+                                pi.y -= normY * correction
+                                pj.x += normX * correction
+                                pj.y += normY * correction
 
-                            // Inelastic contact velocity damping along normal (prevents artificial bounce jitter)
-                            val rvx = pi.vx - pj.vx
-                            val rvy = pi.vy - pj.vy
-                            val normalVel = rvx * normX + rvy * normY
-                            if (normalVel > 0f) {
-                                val impulseVel = normalVel * 0.45f
-                                pi.vx -= normX * impulseVel
-                                pi.vy -= normY * impulseVel
-                                pj.vx += normX * impulseVel
-                                pj.vy += normY * impulseVel
+                                // Inelastic contact velocity damping along normal (prevents artificial bounce jitter)
+                                val rvx = pi.vx - pj.vx
+                                val rvy = pi.vy - pj.vy
+                                val normalVel = rvx * normX + rvy * normY
+                                if (normalVel > 0f) {
+                                    val impulseVel = normalVel * 0.45f
+                                    pi.vx -= normX * impulseVel
+                                    pi.vy -= normY * impulseVel
+                                    pj.vx += normX * impulseVel
+                                    pj.vy += normY * impulseVel
+                                }
                             }
                         }
+                        handleWallCollision(pi)
                     }
-                    handleWallCollision(pi)
                 }
             }
         }
@@ -399,18 +405,18 @@ class FluidSimulationEngine(
         val r = p.radius
         if (p.x < r) {
             p.x = r
-            p.vx = -p.vx * boundaryDamping
+            p.vx = if (kotlin.math.abs(p.vx) < 25f) 0f else -p.vx * boundaryDamping
         } else if (p.x > screenWidth - r) {
             p.x = screenWidth - r
-            p.vx = -p.vx * boundaryDamping
+            p.vx = if (kotlin.math.abs(p.vx) < 25f) 0f else -p.vx * boundaryDamping
         }
 
         if (p.y < r) {
             p.y = r
-            p.vy = -p.vy * boundaryDamping
+            p.vy = if (kotlin.math.abs(p.vy) < 25f) 0f else -p.vy * boundaryDamping
         } else if (p.y > screenHeight - r) {
             p.y = screenHeight - r
-            p.vy = -p.vy * boundaryDamping
+            p.vy = if (kotlin.math.abs(p.vy) < 25f) 0f else -p.vy * boundaryDamping
         }
     }
 

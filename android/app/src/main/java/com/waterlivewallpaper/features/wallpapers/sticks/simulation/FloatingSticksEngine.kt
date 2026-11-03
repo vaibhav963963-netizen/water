@@ -20,14 +20,15 @@ class FloatingSticksEngine(
 ) {
     val sticks = ArrayList<FloatingStick>()
 
-    private val linearDampingAir = 0.999f
-    private val linearDampingWater = 0.985f
-    private val angularDampingAir = 0.995f
-    private val angularDampingWater = 0.940f
-    private val wallRestitution = 0.38f
-    private val stickRestitution = 0.42f
+    // Realistic viscous wood drag & rotational friction
+    private val linearDampingAir = 0.965f
+    private val linearDampingWater = 0.940f
+    private val angularDampingAir = 0.930f
+    private val angularDampingWater = 0.890f
+    private val wallRestitution = 0.28f
+    private val stickRestitution = 0.32f
     private val buoyancyCoeff = 1.35f
-    private val fluidDragCoeff = 2.80f
+    private val fluidDragCoeff = 3.60f
 
     init {
         initializeDefaultSticks()
@@ -51,19 +52,20 @@ class FloatingSticksEngine(
 
             for (i in 0 until count) {
                 val texIdx = (i % 6) + 1
+                // Natural wood dimensions: ~42% to 48% of 1080p screen width for authentic presence
                 val baseLen = when (texIdx) {
-                    1 -> 220f
-                    2 -> 240f
-                    3 -> 200f
-                    4 -> 230f
-                    5 -> 210f
-                    else -> 190f
+                    1 -> 480f
+                    2 -> 520f
+                    3 -> 440f
+                    4 -> 500f
+                    5 -> 470f
+                    else -> 430f
                 }
                 val baseRad = when (texIdx) {
-                    2 -> 20f
-                    4 -> 16f
-                    6 -> 14f
-                    else -> 18f
+                    2 -> 42f
+                    4 -> 36f
+                    6 -> 32f
+                    else -> 38f
                 }
 
                 val len = baseLen * scale
@@ -73,7 +75,7 @@ class FloatingSticksEngine(
                 val row = i / cols
                 val spacingX = screenWidth / (cols + 1f)
                 val initialX = spacingX * (col + 1f) + (Random.nextFloat() - 0.5f) * 20f
-                val initialY = screenHeight * 0.45f + row * (65f * scale) + (Random.nextFloat() - 0.5f) * 30f
+                val initialY = screenHeight * 0.40f + row * (rad * 2.8f) + (Random.nextFloat() - 0.5f) * 30f
                 val initialAngle = (Random.nextFloat() - 0.5f) * 0.6f
 
                 sticks.add(
@@ -163,10 +165,11 @@ class FloatingSticksEngine(
 
                 s.submergedFraction = submergedPointsCount.toFloat() / samples.size
 
-                // 2. Linear motion integration
-                // Gravity applies to total stick mass
-                val totalFx = s.mass * gx + totalBuoyancyX + totalDragX
-                val totalFy = s.mass * gy + totalBuoyancyY + totalDragY
+                // 2. Linear motion integration with realistic wood mass inertia (not hyper-sensitive)
+                val effectiveGx = gx * 0.40f
+                val effectiveGy = gy * 0.40f
+                val totalFx = s.mass * effectiveGx + totalBuoyancyX + totalDragX
+                val totalFy = s.mass * effectiveGy + totalBuoyancyY + totalDragY
 
                 val ax = totalFx / s.mass
                 val ay = totalFy / s.mass
@@ -179,12 +182,18 @@ class FloatingSticksEngine(
                 s.vx *= linearDamping
                 s.vy *= linearDamping
 
-                // Clamp extreme velocities for numerical stability
+                // Viscous quadratic resistance: gives wood realistic weight & natural terminal drift
                 val v2 = s.vx * s.vx + s.vy * s.vy
-                if (v2 > 3500f * 3500f) {
+                if (v2 > 100f) {
+                    val drag = (kotlin.math.sqrt(v2) * 0.002f).coerceAtMost(0.12f)
+                    s.vx *= (1f - drag)
+                    s.vy *= (1f - drag)
+                }
+
+                if (v2 > 2400f * 2400f) {
                     val spd = sqrt(v2)
-                    s.vx = (s.vx / spd) * 3500f
-                    s.vy = (s.vy / spd) * 3500f
+                    s.vx = (s.vx / spd) * 2400f
+                    s.vy = (s.vy / spd) * 2400f
                 }
 
                 s.x += s.vx * dt

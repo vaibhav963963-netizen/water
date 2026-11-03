@@ -37,14 +37,14 @@ export class FloatingSticksEngine {
   private width: number;
   private height: number;
 
-  private readonly linearDampingAir = 0.999;
-  private readonly linearDampingWater = 0.985;
-  private readonly angularDampingAir = 0.995;
-  private readonly angularDampingWater = 0.940;
-  private readonly wallRestitution = 0.38;
-  private readonly stickRestitution = 0.42;
+  private readonly linearDampingAir = 0.965;
+  private readonly linearDampingWater = 0.940;
+  private readonly angularDampingAir = 0.930;
+  private readonly angularDampingWater = 0.890;
+  private readonly wallRestitution = 0.28;
+  private readonly stickRestitution = 0.32;
   private readonly buoyancyCoeff = 1.35;
-  private readonly fluidDragCoeff = 2.80;
+  private readonly fluidDragCoeff = 3.60;
 
   private stickScale: number = 1.0;
 
@@ -77,8 +77,11 @@ export class FloatingSticksEngine {
     for (let i = 0; i < clampedCount; i++) {
       // Pick twig texture cyclically/randomly across available 6 textures
       const texIdx = (i % 6) + 1;
-      const baseLen = texIdx === 1 ? 220 : texIdx === 2 ? 240 : texIdx === 3 ? 200 : texIdx === 4 ? 230 : texIdx === 5 ? 210 : 190;
-      const baseRad = texIdx === 2 ? 20 : texIdx === 4 ? 16 : texIdx === 6 ? 14 : 18;
+      const baseLenRatio = texIdx === 1 ? 0.48 : texIdx === 2 ? 0.52 : texIdx === 3 ? 0.44 : texIdx === 4 ? 0.50 : texIdx === 5 ? 0.46 : 0.42;
+      const baseRadRatio = texIdx === 2 ? 0.065 : texIdx === 4 ? 0.055 : texIdx === 6 ? 0.048 : 0.058;
+
+      const baseLen = Math.max(160, this.width * baseLenRatio);
+      const baseRad = Math.max(20, this.width * baseRadRatio);
 
       const len = baseLen * scale;
       const rad = baseRad * scale;
@@ -93,7 +96,7 @@ export class FloatingSticksEngine {
       this.sticks.push({
         id: i + 1,
         x: spacingX * (col + 1) + (Math.random() - 0.5) * 20,
-        y: this.height * 0.45 + row * 65 + (Math.random() - 0.5) * 30,
+        y: this.height * 0.40 + row * (rad * 2.6) + (Math.random() - 0.5) * 30,
         vx: 0,
         vy: 0,
         angle: (Math.random() - 0.5) * 0.6,
@@ -164,9 +167,11 @@ export class FloatingSticksEngine {
 
       s.submergedFraction = submergedCount / samples.length;
 
-      // Linear motion
-      const totalFx = s.mass * gx + totalBuoyancyX + totalDragX;
-      const totalFy = s.mass * gy + totalBuoyancyY + totalDragY;
+      // Linear motion with realistic inertia and drag
+      const effectiveGx = gx * 0.40;
+      const effectiveGy = gy * 0.40;
+      const totalFx = s.mass * effectiveGx + totalBuoyancyX + totalDragX;
+      const totalFy = s.mass * effectiveGy + totalBuoyancyY + totalDragY;
 
       s.vx += (totalFx / s.mass) * dt;
       s.vy += (totalFy / s.mass) * dt;
@@ -174,6 +179,13 @@ export class FloatingSticksEngine {
       const linearDamping = s.submergedFraction > 0.2 ? this.linearDampingWater : this.linearDampingAir;
       s.vx *= linearDamping;
       s.vy *= linearDamping;
+
+      const spd2 = s.vx * s.vx + s.vy * s.vy;
+      if (spd2 > 100) {
+        const drag = Math.min(0.12, Math.sqrt(spd2) * 0.002);
+        s.vx *= (1 - drag);
+        s.vy *= (1 - drag);
+      }
 
       s.x += s.vx * dt;
       s.y += s.vy * dt;

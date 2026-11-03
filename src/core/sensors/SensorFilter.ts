@@ -88,11 +88,15 @@ export class SensorFilter {
       this.gravityZ * this.gravityZ
     );
 
-    // Snap near-zero X gravity to 0 and upright Y to 9.8 to eliminate resting hand tremor
+    // Enhanced deadzone for physiological hand tremor & resting tilt
     let cleanGx = this.gravityX;
     let cleanGy = this.gravityY;
-    if (Math.abs(cleanGx) < 0.15) cleanGx = 0;
-    if (Math.abs(cleanGy - 9.8) < 0.20) cleanGy = 9.8;
+    if (Math.abs(cleanGx) < 0.45) cleanGx = 0;
+    if (cleanGy > 3.5 && cleanGx === 0) {
+      cleanGy = 9.8;
+    } else if (Math.abs(cleanGy - 9.8) < 0.35) {
+      cleanGy = 9.8;
+    }
 
     const nx = norm > 0.0001 ? this.gravityX / norm : 0;
     const ny = norm > 0.0001 ? this.gravityY / norm : 0;
