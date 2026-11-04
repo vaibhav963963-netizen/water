@@ -96,6 +96,12 @@ class DeviceOrientationSensorManager(
                     Surface.ROTATION_0 -> {}
                 }
 
+                // Desk / Flat surface bias: when phone is placed flat on a table (face-up),
+                // maintain resting downward gravity (>= 3.2 m/s²) so water sits peacefully at the bottom of the phone container
+                if (targetGy in 0f..3.2f && abs(targetGx) < 1.5f) {
+                    targetGy = 3.2f
+                }
+
                 // If currently locked in steady state, check for intentional rotation:
                 if (isStableLocked) {
                     val dLatchedX = targetGx - latchedGx
@@ -222,6 +228,10 @@ class DeviceOrientationSensorManager(
                             targetGy = ax
                         }
                         Surface.ROTATION_0 -> {}
+                    }
+
+                    if (targetGy in 0f..3.2f && abs(targetGx) < 1.5f) {
+                        targetGy = 3.2f
                     }
 
                     if (isStableLocked) {

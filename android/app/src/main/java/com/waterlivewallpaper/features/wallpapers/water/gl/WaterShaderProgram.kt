@@ -9,7 +9,53 @@ class WaterShaderProgram {
         private const val TAG = "WaterShaderProgram"
     }
 
-    // Pass 1: Density splat program
+    // 1. Background Shader (Aspect-ratio preserving cover mode, zero stretching)
+    var bgProgramId: Int = 0
+        private set
+    var aBgPositionLoc: Int = -1
+        private set
+    var aBgTexCoordLoc: Int = -1
+        private set
+    var uBgTextureLoc: Int = -1
+        private set
+    var uBgScreenResLoc: Int = -1
+        private set
+    var uBgResLoc: Int = -1
+        private set
+    var uBgHasTextureLoc: Int = -1
+        private set
+    var uBgSolidColorLoc: Int = -1
+        private set
+
+    // 2. Container Water Mesh Shader (Renders crystal-clear liquid filling container up to wave surface)
+    var waterMeshProgramId: Int = 0
+        private set
+    var aWaterPositionLoc: Int = -1
+        private set
+    var aWaterDepthLoc: Int = -1
+        private set
+    var uWaterResolutionLoc: Int = -1
+        private set
+    var uWaterColorLoc: Int = -1
+        private set
+    var uWaterSecondaryColorLoc: Int = -1
+        private set
+    var uWaterGlowIntensityLoc: Int = -1
+        private set
+
+    // 3. Splash Spray Droplets Shader
+    var dropletProgramId: Int = 0
+        private set
+    var aDropletPositionLoc: Int = -1
+        private set
+    var aDropletRadiusLoc: Int = -1
+        private set
+    var uDropletResolutionLoc: Int = -1
+        private set
+    var uDropletColorLoc: Int = -1
+        private set
+
+    // Legacy Density & Isosurface stubs
     var densityProgramId: Int = 0
         private set
     var aDensityPositionLoc: Int = -1
@@ -18,8 +64,6 @@ class WaterShaderProgram {
         private set
     var uDensityResolutionLoc: Int = -1
         private set
-
-    // Pass 2: Isosurface threshold & glow program
     var isoProgramId: Int = 0
         private set
     var aIsoQuadPositionLoc: Int = -1
@@ -44,59 +88,88 @@ class WaterShaderProgram {
         private set
 
     fun initialize(): Boolean {
-        // 1. Build Density Splat Program
-        val densVert = compileShader(GLES20.GL_VERTEX_SHADER, Shaders.DENSITY_VERTEX_SHADER)
-        val densFrag = compileShader(GLES20.GL_FRAGMENT_SHADER, Shaders.DENSITY_FRAGMENT_SHADER)
-        if (densVert == 0 || densFrag == 0) return false
+        // 1. Build Background Program
+        val bgVert = compileShader(GLES20.GL_VERTEX_SHADER, Shaders.BG_VERTEX_SHADER)
+        val bgFrag = compileShader(GLES20.GL_FRAGMENT_SHADER, Shaders.BG_FRAGMENT_SHADER)
+        if (bgVert != 0 && bgFrag != 0) {
+            bgProgramId = GLES20.glCreateProgram()
+            GLES20.glAttachShader(bgProgramId, bgVert)
+            GLES20.glAttachShader(bgProgramId, bgFrag)
+            GLES20.glLinkProgram(bgProgramId)
 
-        densityProgramId = GLES20.glCreateProgram()
-        GLES20.glAttachShader(densityProgramId, densVert)
-        GLES20.glAttachShader(densityProgramId, densFrag)
-        GLES20.glLinkProgram(densityProgramId)
+            aBgPositionLoc = GLES20.glGetAttribLocation(bgProgramId, "a_Position")
+            aBgTexCoordLoc = GLES20.glGetAttribLocation(bgProgramId, "a_TexCoord")
+            uBgTextureLoc = GLES20.glGetUniformLocation(bgProgramId, "u_Texture")
+            uBgScreenResLoc = GLES20.glGetUniformLocation(bgProgramId, "u_ScreenResolution")
+            uBgResLoc = GLES20.glGetUniformLocation(bgProgramId, "u_BgResolution")
+            uBgHasTextureLoc = GLES20.glGetUniformLocation(bgProgramId, "u_HasTexture")
+            uBgSolidColorLoc = GLES20.glGetUniformLocation(bgProgramId, "u_SolidColor")
 
-        val linkStatus1 = IntArray(1)
-        GLES20.glGetProgramiv(densityProgramId, GLES20.GL_LINK_STATUS, linkStatus1, 0)
-        if (linkStatus1[0] == 0) {
-            Log.e(TAG, "Density program link failed: " + GLES20.glGetProgramInfoLog(densityProgramId))
+            GLES20.glDeleteShader(bgVert)
+            GLES20.glDeleteShader(bgFrag)
+        }
+
+        // 2. Build Container Water Mesh Program
+        val waterVert = compileShader(GLES20.GL_VERTEX_SHADER, Shaders.WATER_MESH_VERTEX_SHADER)
+        val waterFrag = compileShader(GLES20.GL_FRAGMENT_SHADER, Shaders.WATER_MESH_FRAGMENT_SHADER)
+        if (waterVert == 0 || waterFrag == 0) return false
+
+        waterMeshProgramId = GLES20.glCreateProgram()
+        GLES20.glAttachShader(waterMeshProgramId, waterVert)
+        GLES20.glAttachShader(waterMeshProgramId, waterFrag)
+        GLES20.glLinkProgram(waterMeshProgramId)
+
+        val linkStatus = IntArray(1)
+        GLES20.glGetProgramiv(waterMeshProgramId, GLES20.GL_LINK_STATUS, linkStatus, 0)
+        if (linkStatus[0] == 0) {
+            Log.e(TAG, "Water mesh program link failed: " + GLES20.glGetProgramInfoLog(waterMeshProgramId))
             return false
         }
 
-        aDensityPositionLoc = GLES20.glGetAttribLocation(densityProgramId, "a_Position")
-        aDensityRadiusLoc = GLES20.glGetAttribLocation(densityProgramId, "a_Radius")
-        uDensityResolutionLoc = GLES20.glGetUniformLocation(densityProgramId, "u_Resolution")
+        aWaterPositionLoc = GLES20.glGetAttribLocation(waterMeshProgramId, "a_Position")
+        aWaterDepthLoc = GLES20.glGetAttribLocation(waterMeshProgramId, "a_Depth")
+        uWaterResolutionLoc = GLES20.glGetUniformLocation(waterMeshProgramId, "u_Resolution")
+        uWaterColorLoc = GLES20.glGetUniformLocation(waterMeshProgramId, "u_WaterColor")
+        uWaterSecondaryColorLoc = GLES20.glGetUniformLocation(waterMeshProgramId, "u_SecondaryColor")
+        uWaterGlowIntensityLoc = GLES20.glGetUniformLocation(waterMeshProgramId, "u_GlowIntensity")
 
-        // 2. Build Isosurface Program
-        val isoVert = compileShader(GLES20.GL_VERTEX_SHADER, Shaders.ISOSURFACE_VERTEX_SHADER)
-        val isoFrag = compileShader(GLES20.GL_FRAGMENT_SHADER, Shaders.ISOSURFACE_FRAGMENT_SHADER)
-        if (isoVert == 0 || isoFrag == 0) return false
+        GLES20.glDeleteShader(waterVert)
+        GLES20.glDeleteShader(waterFrag)
 
-        isoProgramId = GLES20.glCreateProgram()
-        GLES20.glAttachShader(isoProgramId, isoVert)
-        GLES20.glAttachShader(isoProgramId, isoFrag)
-        GLES20.glLinkProgram(isoProgramId)
+        // 3. Build Droplet Program
+        val dropVert = compileShader(GLES20.GL_VERTEX_SHADER, Shaders.DROPLET_VERTEX_SHADER)
+        val dropFrag = compileShader(GLES20.GL_FRAGMENT_SHADER, Shaders.DROPLET_FRAGMENT_SHADER)
+        if (dropVert != 0 && dropFrag != 0) {
+            dropletProgramId = GLES20.glCreateProgram()
+            GLES20.glAttachShader(dropletProgramId, dropVert)
+            GLES20.glAttachShader(dropletProgramId, dropFrag)
+            GLES20.glLinkProgram(dropletProgramId)
 
-        val linkStatus2 = IntArray(1)
-        GLES20.glGetProgramiv(isoProgramId, GLES20.GL_LINK_STATUS, linkStatus2, 0)
-        if (linkStatus2[0] == 0) {
-            Log.e(TAG, "Isosurface program link failed: " + GLES20.glGetProgramInfoLog(isoProgramId))
-            return false
+            aDropletPositionLoc = GLES20.glGetAttribLocation(dropletProgramId, "a_Position")
+            aDropletRadiusLoc = GLES20.glGetAttribLocation(dropletProgramId, "a_Radius")
+            uDropletResolutionLoc = GLES20.glGetUniformLocation(dropletProgramId, "u_Resolution")
+            uDropletColorLoc = GLES20.glGetUniformLocation(dropletProgramId, "u_Color")
+
+            GLES20.glDeleteShader(dropVert)
+            GLES20.glDeleteShader(dropFrag)
         }
-
-        aIsoQuadPositionLoc = GLES20.glGetAttribLocation(isoProgramId, "a_QuadPosition")
-        uIsoDensityTextureLoc = GLES20.glGetUniformLocation(isoProgramId, "u_DensityTexture")
-        uIsoWaterColorLoc = GLES20.glGetUniformLocation(isoProgramId, "u_WaterColor")
-        uIsoSecondaryColorLoc = GLES20.glGetUniformLocation(isoProgramId, "u_SecondaryColor")
-        uIsoBackgroundColorLoc = GLES20.glGetUniformLocation(isoProgramId, "u_BackgroundColor")
-        uIsoGlowIntensityLoc = GLES20.glGetUniformLocation(isoProgramId, "u_GlowIntensity")
-        uIsoBackgroundTextureLoc = GLES20.glGetUniformLocation(isoProgramId, "u_BackgroundTexture")
-        uIsoHasCustomBgLoc = GLES20.glGetUniformLocation(isoProgramId, "u_HasCustomBackground")
-        uIsoScreenResLoc = GLES20.glGetUniformLocation(isoProgramId, "u_ScreenResolution")
-        uIsoBgResLoc = GLES20.glGetUniformLocation(isoProgramId, "u_BgResolution")
 
         return true
     }
 
     fun release() {
+        if (bgProgramId != 0) {
+            GLES20.glDeleteProgram(bgProgramId)
+            bgProgramId = 0
+        }
+        if (waterMeshProgramId != 0) {
+            GLES20.glDeleteProgram(waterMeshProgramId)
+            waterMeshProgramId = 0
+        }
+        if (dropletProgramId != 0) {
+            GLES20.glDeleteProgram(dropletProgramId)
+            dropletProgramId = 0
+        }
         if (densityProgramId != 0) {
             GLES20.glDeleteProgram(densityProgramId)
             densityProgramId = 0
