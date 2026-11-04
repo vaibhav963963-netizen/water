@@ -7,7 +7,6 @@ import android.hardware.SensorEventListener
 import android.hardware.SensorManager
 import android.view.Surface
 import kotlin.math.abs
-import kotlin.math.sqrt
 
 class DeviceOrientationSensorManager(
     context: Context,
@@ -22,15 +21,11 @@ class DeviceOrientationSensorManager(
     private var smoothGx = 0f
     private var smoothGy = 9.8f
 
-    // Dynamic Stability Lock / Latch: completely eliminates sensor tremor & micro-fluctuations when device is steady
+    // Dynamic Stability Lock / Latch: eliminates sensor tremor & micro-fluctuations when device is steady
     private var latchedGx = 0f
     private var latchedGy = 9.8f
     private var isStableLocked = false
     private var stableSamplesCount = 0
-
-    private var prevAx = 0f
-    private var prevAy = 0f
-    private var prevAz = 0f
 
     var displayRotation: Int = Surface.ROTATION_0
 
@@ -38,8 +33,9 @@ class DeviceOrientationSensorManager(
     private var lastCallbackGy = 0f
 
     private var lastShakeTimeNs: Long = 0L
-    private val shakeThresholdSq = 4.2f * 4.2f // Realistic physical hand shake gesture (~4.2 m/s² dynamic acceleration)
-    private val shakeCooldownNs = 320_000_000L   // 320ms cooldown between splashes
+    private val shakeThresholdSq = 2.6f * 2.6f // Calibrated dynamic acceleration (~2.6 m/s²) for responsive hand shake
+    private val shakeCooldownNs = 280_000_000L  // 280ms cooldown between splashes
+    private val impulseScale = 180f            // Calibrated impulse scaling for realistic water splash and droplet launch
 
     fun start(samplingPeriodUs: Int = 33_333) { // ~30 Hz: Optimal battery efficiency & silky fluid tracking
         isStableLocked = false
@@ -53,7 +49,8 @@ class DeviceOrientationSensorManager(
         if (linearAccelSensor != null) {
             sensorManager.registerListener(this, linearAccelSensor, samplingPeriodUs)
         }
-        if (accelerometer != null) {
+        if (accelerometer != null && linearAccelSensor == null && gravitySensor != null) {
+            // Only need accelerometer if linearAccelSensor is missing (to provide fallback dynamic shake)
             sensorManager.registerListener(this, accelerometer, samplingPeriodUs)
         }
     }
@@ -63,10 +60,23 @@ class DeviceOrientationSensorManager(
     }
 
     fun hasGravitySensor(): Boolean = gravitySensor != null
-
     fun hasAccelerometer(): Boolean = accelerometer != null
-
     fun hasRotationVector(): Boolean = sensorManager.getDefaultSensor(Sensor.TYPE_ROTATION_VECTOR) != null
+
+    /**
+     * Transforms 2D device sensor coordinates (X right, Y up) into screen coordinates
+     * (X right, Y down) for all 4 device orientations:
+     * ROTATION_0 (Portrait), ROTATION_90 (Landscape), ROTATION_180 (Inverted Portrait), ROTATION_270 (Reverse Landscape).
+     */
+    private fun transformToScreenSpace(devX: Float, devY: Float): Pair<Float, Float> {
+        return when (displayRotation) {
+            Surface.ROTATION_90 -> Pair(devY, devX)
+            Surface.ROTATION_180 -> Pair(devX, -devY)
+            Surface.ROTATION_270 -> Pair(-devY, -devX)
+            Surface.ROTATION_0 -> Pair(-devX, devY)
+            else -> Pair(-devX, devY)
+        }
+    }
 
     override fun onSensorChanged(event: SensorEvent?) {
         if (event == null) return
@@ -76,25 +86,7 @@ class DeviceOrientationSensorManager(
                 val rawX = event.values[0]
                 val rawY = event.values[1]
 
-                // Transform raw sensor coordinates to Screen Space:
-                var targetGx = -rawX
-                var targetGy = rawY
-
-                when (displayRotation) {
-                    Surface.ROTATION_90 -> {
-                        targetGx = -rawY
-                        targetGy = -rawX
-                    }
-                    Surface.ROTATION_180 -> {
-                        targetGx = rawX
-                        targetGy = -rawY
-                    }
-                    Surface.ROTATION_270 -> {
-                        targetGx = rawY
-                        targetGy = rawX
-                    }
-                    Surface.ROTATION_0 -> {}
-                }
+                val (targetGx, targetGy) = transformToScreenSpace(rawX, rawY)
 
                 // If currently locked in steady state, check for intentional rotation:
                 if (isStableLocked) {
@@ -135,7 +127,6 @@ class DeviceOrientationSensorManager(
                         // Snap near-zero upright deadzones
                         if (abs(smoothGx) < 0.35f) smoothGx = 0f
                         if (abs(smoothGy - 9.8f) < 0.35f && smoothGx == 0f) smoothGy = 9.8f
-                            if (abs(smoothGy - (-9.8f)) < 0.35f && smoothGx == 0f) smoothGy = -9.8f
                         if (abs(smoothGy - (-9.8f)) < 0.35f && smoothGx == 0f) smoothGy = -9.8f
 
                         latchedGx = smoothGx
@@ -167,35 +158,18 @@ class DeviceOrientationSensorManager(
                 val lx = event.values[0]
                 val ly = event.values[1]
                 val lz = event.values[2]
-                val linMag2 = lx * lx + ly * ly + lz * lz
+
+                val (screenLinX, screenLinY) = transformToScreenSpace(lx, ly)
+                val linMag2 = screenLinX * screenLinX + screenLinY * screenLinY + lz * lz
 
                 val nowNs = System.nanoTime()
                 if (linMag2 >= shakeThresholdSq && (nowNs - lastShakeTimeNs >= shakeCooldownNs)) {
                     lastShakeTimeNs = nowNs
                     isStableLocked = false
                     stableSamplesCount = 0
-                    var screenLinX = -lx
-                    var screenLinY = ly
 
-                    when (displayRotation) {
-                        Surface.ROTATION_90 -> {
-                            screenLinX = -ly
-                            screenLinY = -lx
-                        }
-                        Surface.ROTATION_180 -> {
-                            screenLinX = lx
-                            screenLinY = -ly
-                        }
-                        Surface.ROTATION_270 -> {
-                            screenLinX = ly
-                            screenLinY = lx
-                        }
-                        Surface.ROTATION_0 -> {}
-                    }
-
-                    val scaleFactor = 30f
-                    val impulseX = screenLinX * scaleFactor
-                    val impulseY = screenLinY * scaleFactor
+                    val impulseX = screenLinX * impulseScale
+                    val impulseY = screenLinY * impulseScale
                     onOrientationUpdate(smoothGx, smoothGy, true, impulseX, impulseY)
                 }
             }
@@ -207,24 +181,7 @@ class DeviceOrientationSensorManager(
 
                 // Fallback gravity if gravity sensor is missing
                 if (gravitySensor == null) {
-                    var targetGx = -ax
-                    var targetGy = ay
-
-                    when (displayRotation) {
-                        Surface.ROTATION_90 -> {
-                            targetGx = -ay
-                            targetGy = -ax
-                        }
-                        Surface.ROTATION_180 -> {
-                            targetGx = ax
-                            targetGy = -ay
-                        }
-                        Surface.ROTATION_270 -> {
-                            targetGx = ay
-                            targetGy = ax
-                        }
-                        Surface.ROTATION_0 -> {}
-                    }
+                    val (targetGx, targetGy) = transformToScreenSpace(ax, ay)
 
                     if (isStableLocked) {
                         val dLatchedX = targetGx - latchedGx
@@ -257,6 +214,7 @@ class DeviceOrientationSensorManager(
                             isStableLocked = true
                             if (abs(smoothGx) < 0.35f) smoothGx = 0f
                             if (abs(smoothGy - 9.8f) < 0.35f && smoothGx == 0f) smoothGy = 9.8f
+                            if (abs(smoothGy - (-9.8f)) < 0.35f && smoothGx == 0f) smoothGy = -9.8f
 
                             latchedGx = smoothGx
                             latchedGy = smoothGy
@@ -283,38 +241,23 @@ class DeviceOrientationSensorManager(
                     }
                 }
 
-                // Universal dynamic acceleration shake detection (handles devices with or without TYPE_LINEAR_ACCELERATION)
-                val dax = ax - (-smoothGx)
-                val day = ay - smoothGy
-                val dynMag2 = dax * dax + day * day
+                // Fallback shake detection if linear acceleration sensor is missing
+                if (linearAccelSensor == null) {
+                    val (screenAx, screenAy) = transformToScreenSpace(ax, ay)
+                    val screenLinX = screenAx - smoothGx
+                    val screenLinY = screenAy - smoothGy
+                    val dynMag2 = screenLinX * screenLinX + screenLinY * screenLinY
 
-                val nowNs = System.nanoTime()
-                if (dynMag2 >= shakeThresholdSq && (nowNs - lastShakeTimeNs >= shakeCooldownNs)) {
-                    lastShakeTimeNs = nowNs
-                    isStableLocked = false
-                    stableSamplesCount = 0
-                    var screenLinX = -dax
-                    var screenLinY = day
+                    val nowNs = System.nanoTime()
+                    if (dynMag2 >= shakeThresholdSq && (nowNs - lastShakeTimeNs >= shakeCooldownNs)) {
+                        lastShakeTimeNs = nowNs
+                        isStableLocked = false
+                        stableSamplesCount = 0
 
-                    when (displayRotation) {
-                        Surface.ROTATION_90 -> {
-                            screenLinX = -day
-                            screenLinY = -dax
-                        }
-                        Surface.ROTATION_180 -> {
-                            screenLinX = dax
-                            screenLinY = -day
-                        }
-                        Surface.ROTATION_270 -> {
-                            screenLinX = day
-                            screenLinY = dax
-                        }
-                        Surface.ROTATION_0 -> {}
+                        val impulseX = screenLinX * impulseScale
+                        val impulseY = screenLinY * impulseScale
+                        onOrientationUpdate(smoothGx, smoothGy, true, impulseX, impulseY)
                     }
-
-                    val impulseX = screenLinX * 30f
-                    val impulseY = screenLinY * 30f
-                    onOrientationUpdate(smoothGx, smoothGy, true, impulseX, impulseY)
                 }
             }
         }

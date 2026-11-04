@@ -4,12 +4,9 @@ import java.nio.ByteBuffer
 import java.nio.ByteOrder
 import java.nio.FloatBuffer
 import kotlin.math.abs
-import kotlin.math.atan2
-import kotlin.math.cos
 import kotlin.math.hypot
 import kotlin.math.max
 import kotlin.math.min
-import kotlin.math.sin
 import kotlin.math.sqrt
 import kotlin.random.Random
 
@@ -39,16 +36,14 @@ enum class SimulationState {
 }
 
 /**
- * High-Density 360-Degree Continuous Container Fluid Engine.
+ * Authentic Continuous Container Fluid Engine with SPH Dynamics.
  *
- * Simulates real fluid stored in a closed 2D container [0, screenWidth] x [0, screenHeight]:
- * 1. 360-Degree Gravity: Responds to any phone orientation (upright, landscape, upside-down 180°, diagonal).
- * 2. Fine Particle Size: Small, high-density particles (radius 10-12px) that flow like water and pack
- *    flat against container walls instead of balling into giant jelly lumps.
- * 3. Wall-to-Wall Incompressible Fluid: Covers the entire container floor/walls without corner voids.
- * 4. Realistic Low Cohesion & Viscosity: Water flows freely and levels out flat under gravity.
- * 5. Settling & Absolute Sleep State Machine: Smoothly dissipates wave energy and locks to zero movement at rest.
- * 6. Dynamic Splash & Shake: High inertial impulses break off fine, realistic spray droplets with true ballistic trajectories.
+ * Models liquid stored in a closed 2D container [0, screenWidth] x [0, screenHeight]:
+ * 1. 360-Degree Continuous Gravity: Full orientation support (portrait, landscape, upside-down 180°, diagonal).
+ * 2. Uniform Fluid Distribution: Spans wall-to-wall with stable hydrostatic pressure and volume conservation.
+ * 3. Calibrated Cohesion & Viscosity: Natural fluid surface without artificial voids or corner collapse.
+ * 4. Realistic Fine Spray Droplets: Separate under strong acceleration and reconnect on impact with splash ripples.
+ * 5. Three-Phase State Machine: Settles to calm equilibrium and absolute zero-power sleep when motionless.
  */
 class FluidSimulationEngine(
     private var screenWidth: Int,
@@ -58,16 +53,18 @@ class FluidSimulationEngine(
     private var shakeSensitivity: Float = 1.2f,
     private var flowSpeed: Float = 2.0f
 ) {
-    // Dense particle budget with small, realistic droplet radius (10-12px)
     private val particles = ArrayList<Particle>()
-    private val particleRadius = 11.0f
-    private val restDensity = 3.2f
-    private val stiffness = 4200f
-    private val viscosity = 22f
-    private val surfaceTensionCoeff = 1.8f // Ultra-low cohesion: flows flat like real water instead of contracting into a rubber jelly ball
-    private val boundaryDamping = 0.40f
-    private val maxVelocity = 3500f
-    private val dropletMergeRadius = 24f
+
+    // Calibrated SPH physical parameters
+    private val particleRadius = 32.0f
+    private val dropletRadius = 14.0f
+    private val restDensity = 1.8f
+    private val stiffness = 3600f
+    private val viscosity = 24f
+    private val surfaceTensionCoeff = 1.4f
+    private val boundaryDamping = 0.35f
+    private val maxVelocity = 3600f
+    private val dropletMergeRadius = 38f
 
     private var gravityX = 0f
     private var gravityY = 9.8f * 520f * physicsSensitivity * flowSpeed
@@ -87,7 +84,7 @@ class FluidSimulationEngine(
     private var sleepGravityX = 0f
     private var sleepGravityY = 9.8f * 520f * physicsSensitivity * flowSpeed
 
-    // OpenGL ES vertex buffer: [x, y, radius, isDroplet] -> 4 floats per particle
+    // Vertex buffer for OpenGL ES rendering: [x, y, radius, isDroplet] -> 4 floats per particle
     private var renderBuffer: FloatBuffer = ByteBuffer.allocateDirect(1200 * 4 * 4)
         .order(ByteOrder.nativeOrder())
         .asFloatBuffer()
@@ -96,11 +93,31 @@ class FluidSimulationEngine(
         initializeParticles(waterVolumeRatio)
     }
 
+    /**
+     * Resizes simulation container. Proportionally scales particle positions so the
+     * fluid maintains its natural distribution instead of squashing against a wall.
+     */
     fun setDimensions(width: Int, height: Int) {
         if (width <= 0 || height <= 0) return
+        val oldW = this.screenWidth
+        val oldH = this.screenHeight
         this.screenWidth = width
         this.screenHeight = height
-        clampParticles()
+
+        if (oldW > 0 && oldH > 0 && (oldW != width || oldH != height)) {
+            synchronized(particles) {
+                val scaleX = width.toFloat() / oldW.toFloat()
+                val scaleY = height.toFloat() / oldH.toFloat()
+                for (p in particles) {
+                    p.x = (p.x * scaleX).coerceIn(p.radius, width - p.radius)
+                    p.y = (p.y * scaleY).coerceIn(p.radius, height - p.radius)
+                    p.vx = 0f
+                    p.vy = 0f
+                }
+            }
+        } else {
+            clampParticles()
+        }
     }
 
     fun wakeUp() {
@@ -135,8 +152,8 @@ class FluidSimulationEngine(
     }
 
     /**
-     * Spawns particles spanning the full width across the container bottom so water starts as a
-     * complete, level pool with full corner coverage.
+     * Initializes particles spanning the entire width across the intended water volume.
+     * Arranged in a hexagonal lattice for uniform resting density and zero initial voids.
      */
     fun initializeParticles(volume: Float, batterySaver: Boolean = isBatterySaver) {
         synchronized(particles) {
@@ -144,27 +161,35 @@ class FluidSimulationEngine(
             wakeUp()
 
             val w = if (screenWidth > 0) screenWidth.toFloat() else 1080f
-            val h = if (screenHeight > 0) screenHeight.toFloat() else 1920f
+            val h = if (screenHeight > 0) screenHeight.toFloat() else 2400f
 
-            // Budget: 280 to 480 fine particles for high resolution and realistic liquid density
-            val baseMin = if (batterySaver) 220 else 320
-            val baseScale = if (batterySaver) 240 else 360
-            val maxCap = if (batterySaver) 380 else 520
+            // Budget: 180 to 280 particles for balanced performance and rich continuous fluid volume
+            val baseMin = if (batterySaver) 160 else 220
+            val baseScale = if (batterySaver) 120 else 160
+            val maxCap = if (batterySaver) 260 else 360
             val count = (baseMin + volume * baseScale).toInt().coerceIn(baseMin, maxCap)
 
-            val spacing = particleRadius * 1.65f
-            val cols = max(12, ((w - particleRadius * 2) / spacing).toInt())
-            val rows = (count + cols - 1) / cols
+            val poolHeight = h * volume.coerceIn(0.18f, 0.70f)
+            val totalArea = w * poolHeight
+            val areaPerParticle = totalArea / count
+            val spacing = sqrt(areaPerParticle / 0.866f).coerceIn(particleRadius * 1.30f, particleRadius * 2.20f)
 
-            val startX = (w - (cols - 1) * spacing) * 0.5f
-            val startY = h - particleRadius - 15f - (rows - 1) * spacing
+            val rawCols = max(10, (w / spacing).toInt())
+            val cols = if (rawCols % 2 == 1) rawCols + 1 else rawCols
+            val rows = max(4, (count + cols - 1) / cols)
+            val totalParticles = rows * cols
+            val actualSpacingX = w / cols.toFloat()
+            val actualSpacingY = poolHeight / rows.toFloat()
 
-            for (i in 0 until count) {
+            val startX = actualSpacingX * 0.5f
+            val startY = h - poolHeight + actualSpacingY * 0.5f
+
+            for (i in 0 until totalParticles) {
                 val col = i % cols
                 val row = i / cols
-                val px = (startX + col * spacing + (Random.nextFloat() - 0.5f) * 2f)
+                val px = (startX + col * actualSpacingX + (Random.nextFloat() - 0.5f) * 1.5f)
                     .coerceIn(particleRadius + 2f, w - particleRadius - 2f)
-                val py = (startY + row * spacing + (Random.nextFloat() - 0.5f) * 2f)
+                val py = (startY + row * actualSpacingY + (Random.nextFloat() - 0.5f) * 1.5f)
                     .coerceIn(particleRadius + 2f, h - particleRadius - 2f)
 
                 particles.add(
@@ -190,10 +215,7 @@ class FluidSimulationEngine(
 
     /**
      * 360-Degree Continuous Gravity Vector.
-     * gx and gy are the true sensor gravity components.
-     * When upright: gy > 0.
-     * When upside-down 180°: gy < 0.
-     * When landscape: gx != 0.
+     * Supports full orientation rotation (portrait, landscape, upside-down 180°, diagonal).
      */
     fun updateGravity(gx: Float, gy: Float) {
         val scale = 520f * physicsSensitivity * flowSpeed
@@ -218,26 +240,29 @@ class FluidSimulationEngine(
         }
     }
 
+    /**
+     * Applies dynamic acceleration impulse from hand shake gesture.
+     * Displaces water and launches surface particles into fine ballistic spray droplets.
+     */
     fun applyImpulse(impulseX: Float, impulseY: Float) {
         synchronized(particles) {
             val mag2 = impulseX * impulseX + impulseY * impulseY
             if (mag2 < 2.0f) return
 
             wakeUp()
-            val impulseScale = flowSpeed * shakeSensitivity * 1.15f
-            val h = if (screenHeight > 0) screenHeight.toFloat() else 1920f
+            val impulseScale = flowSpeed * shakeSensitivity * 1.25f
 
             for (p in particles) {
-                val jitter = (0.95f + Random.nextFloat() * 0.10f)
+                val jitter = (0.90f + Random.nextFloat() * 0.20f)
                 p.vx += impulseX * impulseScale * jitter
                 p.vy += impulseY * impulseScale * jitter
 
-                // If violent shake, break surface particles into spray droplets with realistic small radius
+                // If high velocity and near surface, break into fine spray droplets
                 val vMag = hypot(p.vx, p.vy)
-                if (vMag > 950f && Random.nextFloat() < 0.12f) {
+                if (vMag > 520f && p.density < restDensity * 1.35f && Random.nextFloat() < 0.30f) {
                     p.isDroplet = true
-                    p.radius = (particleRadius * (0.65f + Random.nextFloat() * 0.35f)).coerceIn(6f, 11f)
-                    p.lifetime = 0f
+                    p.radius = (dropletRadius * (0.80f + Random.nextFloat() * 0.35f)).coerceIn(10f, 18f)
+                    p.lifetime = 0.0f
                 }
             }
         }
@@ -245,7 +270,7 @@ class FluidSimulationEngine(
 
     fun addTouchDisturbance(touchX: Float, touchY: Float, strength: Float = 700f) {
         synchronized(particles) {
-            val radius = 220f
+            val radius = 240f
             val radius2 = radius * radius
             wakeUp()
 
@@ -255,9 +280,15 @@ class FluidSimulationEngine(
                 val dist2 = dx * dx + dy * dy
                 if (dist2 < radius2 && dist2 > 0.001f) {
                     val dist = sqrt(dist2)
-                    val factor = (1f - dist / radius) * strength * flowSpeed * 0.75f
+                    val factor = (1f - dist / radius) * strength * flowSpeed * 0.85f
                     p.vx += (dx / dist) * factor
                     p.vy += (dy / dist) * factor
+
+                    if (dist < radius * 0.45f && Random.nextFloat() < 0.20f) {
+                        p.isDroplet = true
+                        p.radius = (dropletRadius * (0.85f + Random.nextFloat() * 0.30f)).coerceIn(10f, 18f)
+                        p.lifetime = 0.0f
+                    }
                 }
             }
         }
@@ -266,12 +297,17 @@ class FluidSimulationEngine(
     fun step(rawDt: Float) {
         if (state == SimulationState.SLEEPING) return
 
-        val dt = rawDt.coerceIn(0.005f, 0.020f)
-        stepSubstep(dt)
+        val clampedDt = rawDt.coerceIn(0.005f, 0.050f)
+        // Substep for high numerical stability at 30-60 FPS
+        val substeps = if (clampedDt > 0.024f) 2 else 1
+        val dt = clampedDt / substeps
+        for (s in 0 until substeps) {
+            stepSubstep(dt)
+        }
     }
 
     private fun stepSubstep(dt: Float) {
-        val h = particleRadius * 2.3f
+        val h = particleRadius * 2.8f
         val h2 = h * h
 
         synchronized(particles) {
@@ -299,7 +335,7 @@ class FluidSimulationEngine(
                 pi.pressure = max(0f, stiffness * (pi.density - restDensity))
             }
 
-            // 2. Compute Internal Forces: Pressure + Low Cohesion + Viscosity
+            // 2. Compute Internal Forces: Incompressible Pressure + Cohesion + Viscosity
             val dropletMergeRadius2 = dropletMergeRadius * dropletMergeRadius
 
             for (i in 0 until count) {
@@ -324,11 +360,11 @@ class FluidSimulationEngine(
 
                         // Incompressible pressure repulsion
                         val avgPressure = (pi.pressure + pj.pressure) / (2f * pj.density)
-                        val pScalar = avgPressure * q * q * 3.0f
+                        val pScalar = avgPressure * q * q * 3.2f
                         fPressureX -= normX * pScalar
                         fPressureY -= normY * pScalar
 
-                        // Realistic low cohesion (prevents rubber jelly balling)
+                        // Surface tension cohesion: binds liquid body together naturally
                         val cohesionScalar = surfaceTensionCoeff * q * q
                         fPressureX += normX * cohesionScalar
                         fPressureY += normY * cohesionScalar
@@ -340,11 +376,14 @@ class FluidSimulationEngine(
                         fViscosityX += dvx * vScalar
                         fViscosityY += dvy * vScalar
 
-                        // Re-absorb spray droplets back into main fluid body
-                        if (pi.isDroplet && !pj.isDroplet && r2 < dropletMergeRadius2) {
+                        // Reconnect droplets after flight period upon colliding with main water body
+                        if (pi.isDroplet && !pj.isDroplet && pi.lifetime > 0.18f && r2 < dropletMergeRadius2) {
                             pi.isDroplet = false
                             pi.radius = particleRadius
                             pi.lifetime = 0f
+                            // Transfer impact momentum to surface
+                            pj.vx += pi.vx * 0.35f
+                            pj.vy += pi.vy * 0.35f
                         }
                     }
                 }
@@ -359,10 +398,10 @@ class FluidSimulationEngine(
 
                 // Progressive Viscous Damping in SETTLING state
                 if (state == SimulationState.SETTLING) {
-                    pi.vx *= 0.92f
-                    pi.vy *= 0.92f
+                    pi.vx *= 0.88f
+                    pi.vy *= 0.88f
                     // Sub-pixel velocity deadband: snaps to absolute rest
-                    if (pi.vx * pi.vx + pi.vy * pi.vy < 64f) {
+                    if (pi.vx * pi.vx + pi.vy * pi.vy < 49f) {
                         pi.vx = 0f
                         pi.vy = 0f
                     }
@@ -376,10 +415,10 @@ class FluidSimulationEngine(
                     pi.vy *= scale
                 }
 
-                // Droplet lifetime handling
+                // Droplet flight lifetime
                 if (pi.isDroplet) {
                     pi.lifetime += dt
-                    if (pi.lifetime > 3.0f) {
+                    if (pi.lifetime > 4.0f) {
                         pi.isDroplet = false
                         pi.radius = particleRadius
                     }
@@ -392,7 +431,7 @@ class FluidSimulationEngine(
             }
 
             // 4. Soft particle anti-stacking push
-            val minSeparation = particleRadius * 1.15f
+            val minSeparation = particleRadius * 0.95f
             val minSep2 = minSeparation * minSeparation
             for (i in 0 until count) {
                 val pi = particles[i]
@@ -403,7 +442,7 @@ class FluidSimulationEngine(
                     val d2 = dx * dx + dy * dy
                     if (d2 < minSep2 && d2 > 0.001f) {
                         val d = sqrt(d2)
-                        val push = (minSeparation - d) * 0.15f
+                        val push = (minSeparation - d) * 0.18f
                         val nx = dx / d
                         val ny = dy / d
                         pi.x -= nx * push
@@ -427,9 +466,9 @@ class FluidSimulationEngine(
 
             // 6. Transition State Machine: ACTIVE -> SETTLING -> SLEEPING
             if (state == SimulationState.ACTIVE) {
-                if (maxVelocityObserved < 90f && avgVelocityObserved < 35f) {
+                if (maxVelocityObserved < 95f && avgVelocityObserved < 35f) {
                     settlingDuration += dt
-                    if (settlingDuration > 0.30f) {
+                    if (settlingDuration > 0.28f) {
                         state = SimulationState.SETTLING
                         settlingDuration = 0f
                     }
@@ -443,7 +482,7 @@ class FluidSimulationEngine(
                 } else {
                     settlingDuration += dt
                     // Once fluid motion decays to microscopic levels, enter absolute SLEEP
-                    if (settlingDuration > 0.45f && maxVelocityObserved < 20f && avgVelocityObserved < 8f) {
+                    if (settlingDuration > 0.32f && maxVelocityObserved < 22f && avgVelocityObserved < 8f) {
                         for (p in particles) {
                             p.vx = 0f
                             p.vy = 0f
@@ -467,7 +506,7 @@ class FluidSimulationEngine(
     private fun handleWallCollision(p: Particle) {
         val r = p.radius
         val w = if (screenWidth > 0) screenWidth.toFloat() else 1080f
-        val h = if (screenHeight > 0) screenHeight.toFloat() else 1920f
+        val h = if (screenHeight > 0) screenHeight.toFloat() else 2400f
 
         // Left / Right walls
         if (p.x < r) {
@@ -478,7 +517,7 @@ class FluidSimulationEngine(
             p.vx = if (abs(p.vx) < 20f) 0f else -p.vx * boundaryDamping
         }
 
-        // Top / Bottom walls (Top wall handles 180° upside-down phone inversion!)
+        // Top / Bottom walls (Top wall handles 180° upside-down phone inversion)
         if (p.y < r) {
             p.y = r
             p.vy = if (abs(p.vy) < 20f) 0f else -p.vy * boundaryDamping
@@ -531,7 +570,7 @@ class FluidSimulationEngine(
     /**
      * Samples fluid for physical interaction with Floating Sticks live wallpaper.
      */
-    fun sampleFluidAt(x: Float, y: Float, sampleRadius: Float = 55f): FluidSample {
+    fun sampleFluidAt(x: Float, y: Float, sampleRadius: Float = 65f): FluidSample {
         val r2Max = sampleRadius * sampleRadius
         var countNearby = 0
         var sumVx = 0f
@@ -558,7 +597,7 @@ class FluidSimulationEngine(
 
         val avgVx = if (!isAsleep && countNearby > 0) sumVx / countNearby else 0f
         val avgVy = if (!isAsleep && countNearby > 0) sumVy / countNearby else 0f
-        val isSubmerged = densityAccum > 0.35f
+        val isSubmerged = densityAccum > 0.30f
 
         return FluidSample(
             density = densityAccum,

@@ -15,8 +15,9 @@ object Shaders {
             vec2 clipSpace = zeroToOne * 2.0 - 1.0;
             // Invert Y so (0,0) in screen coordinates is at the top of the viewport
             gl_Position = vec4(clipSpace.x, -clipSpace.y, 0.0, 1.0);
-            // Compact splat size for high-density smooth fluid (no giant blobs)
-            gl_PointSize = a_Radius * 3.4;
+            // Splat size in FBO pixel units: FBO is half-resolution (w/2, h/2)
+            // Splat diameter covers adjacent particles in hexagonal lattice smoothly
+            gl_PointSize = a_Radius * 1.55;
         }
     """.trimIndent()
 
@@ -30,14 +31,14 @@ object Shaders {
             if (r2 >= 1.0) {
                 discard;
             }
-            // Smooth Gaussian-like kernel: (1 - r^2)^2
-            float density = 1.0 - r2;
-            density = density * density;
+            // High-order smooth polynomial kernel with zero slope at boundary: (1 - r^2)^3
+            float falloff = 1.0 - r2;
+            float density = falloff * falloff * falloff;
             gl_FragColor = vec4(density, density, density, 1.0);
         }
     """.trimIndent()
 
-    // Pass 2: Fullscreen Translucent Isosurface & Luminous Meniscus reconstruction
+    // Pass 2: Fullscreen Translucent Isosurface Reconstruction with Optical Wave Refraction
     val ISOSURFACE_VERTEX_SHADER = """
         #version 100
         attribute vec2 a_QuadPosition;
@@ -69,57 +70,72 @@ object Shaders {
             vec2 uv = v_TexCoord;
             float density = texture2D(u_DensityTexture, uv).r;
 
-            // Resolve background color: aspect-ratio preserved cover image or solid background
-            vec4 bgColor;
-            if (u_HasCustomBackground == 1) {
-                vec2 rawUv = vec2(uv.x, 1.0 - uv.y);
-                float screenAR = u_ScreenResolution.x / max(u_ScreenResolution.y, 1.0);
-                float bgAR = u_BgResolution.x / max(u_BgResolution.y, 1.0);
-                float r = screenAR / bgAR;
-                vec2 bgUv;
-                if (r > 1.0) {
-                    bgUv = vec2(rawUv.x, 0.5 + (rawUv.y - 0.5) / r);
-                } else {
-                    bgUv = vec2(0.5 + (rawUv.x - 0.5) * r, rawUv.y);
-                }
-                bgColor = texture2D(u_BackgroundTexture, bgUv);
-            } else {
-                bgColor = u_BackgroundColor;
-            }
-
             // Calibrated thresholds for smooth water isosurface
-            float liquidThreshold = 0.15;
-            float glowThreshold = 0.03;
+            float liquidThreshold = 0.22;
+            float glowThreshold = 0.05;
+
+            // Direct background coordinate (aspect-ratio preserved cover image or solid color)
+            vec2 rawUv = vec2(uv.x, 1.0 - uv.y);
+            float screenAR = u_ScreenResolution.x / max(u_ScreenResolution.y, 1.0);
+            float bgAR = u_BgResolution.x / max(u_BgResolution.y, 1.0);
+            float r = screenAR / bgAR;
+            vec2 bgUv = (r > 1.0) ? vec2(rawUv.x, 0.5 + (rawUv.y - 0.5) / r)
+                                  : vec2(0.5 + (rawUv.x - 0.5) * r, rawUv.y);
+            vec4 baseBgColor = (u_HasCustomBackground == 1) ? texture2D(u_BackgroundTexture, bgUv) : u_BackgroundColor;
 
             if (density < glowThreshold) {
-                gl_FragColor = bgColor;
+                gl_FragColor = baseBgColor;
                 return;
             }
 
+            // Normal reconstruction using central differences of the density field
+            vec2 texel = vec2(1.0 / u_ScreenResolution.x, 1.0 / u_ScreenResolution.y) * 2.5;
+            float dL = texture2D(u_DensityTexture, uv - vec2(texel.x, 0.0)).r;
+            float dR = texture2D(u_DensityTexture, uv + vec2(texel.x, 0.0)).r;
+            float dD = texture2D(u_DensityTexture, uv - vec2(0.0, texel.y)).r;
+            float dU = texture2D(u_DensityTexture, uv + vec2(0.0, texel.y)).r;
+
+            vec2 normal2D = vec2(dL - dR, dD - dU);
+            float normalLen = length(normal2D);
+            vec2 normDir = normalLen > 0.001 ? normal2D / normalLen : vec2(0.0);
+
+            // Refract background texture through moving water surface
+            vec2 refractOffset = normDir * min(normalLen * 0.035, 0.022);
+            vec2 refractUv = clamp(uv + refractOffset, 0.001, 0.999);
+            vec2 refractRawUv = vec2(refractUv.x, 1.0 - refractUv.y);
+            vec2 refrBgUv = (r > 1.0) ? vec2(refractRawUv.x, 0.5 + (refractRawUv.y - 0.5) / r)
+                                      : vec2(0.5 + (refractRawUv.x - 0.5) * r, refractRawUv.y);
+            vec4 refractBgColor = (u_HasCustomBackground == 1) ? texture2D(u_BackgroundTexture, refrBgUv) : u_BackgroundColor;
+
             if (density >= liquidThreshold) {
                 // Smooth antialiased boundary edge
-                float edgeAlpha = smoothstep(liquidThreshold - 0.02, liquidThreshold + 0.02, density);
+                float edgeAlpha = smoothstep(liquidThreshold - 0.02, liquidThreshold + 0.03, density);
 
-                // Depth gradient: deeper water has rich blue/cyan body
+                // Depth factor: deeper water has richer ocean hue
                 float depthFactor = clamp((density - liquidThreshold) * 0.45, 0.0, 1.0);
-                vec3 waterTint = mix(u_WaterColor.rgb, u_SecondaryColor.rgb, depthFactor);
+                vec3 waterColor = mix(u_WaterColor.rgb, u_SecondaryColor.rgb, depthFactor);
 
                 // Translucent water: wallpaper is clearly visible through the water
-                float fluidAlpha = mix(0.32, 0.62, depthFactor) * edgeAlpha;
-                vec3 finalRgb = mix(bgColor.rgb, waterTint, fluidAlpha);
+                float fluidAlpha = mix(0.28, 0.58, depthFactor) * edgeAlpha;
+                vec3 finalRgb = mix(refractBgColor.rgb, waterColor, fluidAlpha);
+
+                // Natural sunlight specular gleam on wave crests and droplet surface curvature
+                vec3 lightDir = normalize(vec3(0.35, 0.75, 0.55));
+                vec3 surfNormal3D = normalize(vec3(normDir * 0.75, 1.0 - normalLen * 0.5));
+                float specular = pow(max(dot(surfNormal3D, lightDir), 0.0), 14.0) * 0.45;
 
                 // Luminous meniscus water line along the outer surface boundary
-                float meniscus = smoothstep(liquidThreshold - 0.01, liquidThreshold + 0.03, density) * 
-                                 (1.0 - smoothstep(liquidThreshold + 0.03, liquidThreshold + 0.15, density));
-                vec3 meniscusColor = vec3(0.88, 0.96, 1.0);
-                finalRgb += meniscusColor * (meniscus * 0.55 * u_GlowIntensity);
+                float meniscus = smoothstep(liquidThreshold - 0.02, liquidThreshold + 0.03, density) * 
+                                 (1.0 - smoothstep(liquidThreshold + 0.03, liquidThreshold + 0.20, density));
+                vec3 meniscusColor = vec3(0.92, 0.98, 1.0);
+                finalRgb += meniscusColor * ((meniscus * 0.55 + specular) * u_GlowIntensity);
 
                 gl_FragColor = vec4(finalRgb, 1.0);
             } else {
                 // Soft luminous glow along the outer liquid meniscus
                 float glowFactor = smoothstep(glowThreshold, liquidThreshold, density);
-                float glowAlpha = pow(glowFactor, 1.5) * u_GlowIntensity * 0.50;
-                vec3 finalRgb = mix(bgColor.rgb, u_WaterColor.rgb, glowAlpha);
+                float glowAlpha = pow(glowFactor, 1.4) * u_GlowIntensity * 0.42;
+                vec3 finalRgb = mix(baseBgColor.rgb, u_WaterColor.rgb, glowAlpha);
                 gl_FragColor = vec4(finalRgb, 1.0);
             }
         }

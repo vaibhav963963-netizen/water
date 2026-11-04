@@ -57,8 +57,10 @@ open class WaterWallpaperService : WallpaperService() {
             this.isVisibleState = visible
             if (visible) {
                 // Update display rotation
-                val windowManager = getSystemService(WINDOW_SERVICE) as WindowManager
-                sensorManager.displayRotation = windowManager.defaultDisplay.rotation
+                val windowManager = getSystemService(WINDOW_SERVICE) as? WindowManager
+                if (windowManager != null) {
+                    sensorManager.displayRotation = windowManager.defaultDisplay.rotation
+                }
                 sensorManager.start()
 
                 // If surface is already ready, start rendering
@@ -83,6 +85,11 @@ open class WaterWallpaperService : WallpaperService() {
             super.onSurfaceChanged(holder, format, width, height)
             this.surfaceWidth = width
             this.surfaceHeight = height
+
+            val windowManager = getSystemService(WINDOW_SERVICE) as? WindowManager
+            if (windowManager != null) {
+                sensorManager.displayRotation = windowManager.defaultDisplay.rotation
+            }
 
             simulationEngine.setDimensions(width, height)
             renderer?.onResize(width, height)
