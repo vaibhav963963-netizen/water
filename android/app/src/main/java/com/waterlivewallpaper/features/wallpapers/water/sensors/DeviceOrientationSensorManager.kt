@@ -103,7 +103,7 @@ class DeviceOrientationSensorManager(
                     val intentionalDeltaSq = dLatchedX * dLatchedX + dLatchedY * dLatchedY
 
                     // Require at least ~2.5 deg tilt (0.42 m/s²) to break lock
-                    if (intentionalDeltaSq >= 0.1764f) {
+                    if (intentionalDeltaSq >= 0.0625f) {
                         isStableLocked = false
                         stableSamplesCount = 0
                     } else {
@@ -228,7 +228,7 @@ class DeviceOrientationSensorManager(
                         val dLatchedX = targetGx - latchedGx
                         val dLatchedY = targetGy - latchedGy
                         val intentionalDeltaSq = dLatchedX * dLatchedX + dLatchedY * dLatchedY
-                        if (intentionalDeltaSq >= 0.1764f) {
+                        if (intentionalDeltaSq >= 0.0625f) {
                             isStableLocked = false
                             stableSamplesCount = 0
                         } else {

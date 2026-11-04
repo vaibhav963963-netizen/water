@@ -44,9 +44,9 @@ class FluidSimulationEngine(
     private val particles = ArrayList<Particle>()
     private val particleRadius = 30f
     private val restDensity = 2.6f
-    private val stiffness = 3800f
-    private val viscosity = 32f // Water kinematic viscosity: flows freely with natural wave momentum
-    private val surfaceTensionCoeff = 38f
+    private val stiffness = 3200f
+    private val viscosity = 24f // Water kinematic viscosity: flows freely with natural wave momentum
+    private val surfaceTensionCoeff = 2.5f // Low realistic surface tension: spreads flat like liquid water instead of balling into jelly
     private val boundaryDamping = 0.50f
     private val maxVelocity = 4000f
     private val dropletMergeRadius = 42f
@@ -171,7 +171,7 @@ class FluidSimulationEngine(
             val deltaGSq = dGx * dGx + dGy * dGy
 
             // Intentional tilt threshold: 0.35 m/s² (~2.2 degrees)
-            val threshold = 0.35f * scale
+            val threshold = 0.18f * scale
             if (deltaGSq >= threshold * threshold) {
                 this.gravityX = targetGx
                 this.gravityY = targetGy
@@ -342,8 +342,12 @@ class FluidSimulationEngine(
 
                 // In SETTLING state: gentle, organic wave decay (never sudden freezes)
                 if (state == SimulationState.SETTLING) {
-                    pi.vx *= 0.976f
-                    pi.vy *= 0.976f
+                    pi.vx *= 0.93f
+                    pi.vy *= 0.93f
+                    if (pi.vx * pi.vx + pi.vy * pi.vy < 144f) {
+                        pi.vx = 0f
+                        pi.vy = 0f
+                    }
                 }
 
                 val v2 = pi.vx * pi.vx + pi.vy * pi.vy
@@ -388,7 +392,7 @@ class FluidSimulationEngine(
                     val d2 = dx * dx + dy * dy
                     if (d2 < minSep2 && d2 > 0.001f) {
                         val d = kotlin.math.sqrt(d2)
-                        val push = (minSeparation - d) * 0.28f
+                        val push = (minSeparation - d) * 0.18f
                         val nx = dx / d
                         val ny = dy / d
                         pi.x -= nx * push
@@ -406,9 +410,9 @@ class FluidSimulationEngine(
             // STATE MACHINE TRANSITIONS:
             if (state == SimulationState.ACTIVE) {
                 // Calm threshold: wait until waves naturally subside before settling
-                if (maxVelocityObserved < 130f && avgVelocityObserved < 50f) {
+                if (maxVelocityObserved < 100f && avgVelocityObserved < 40f) {
                     settlingDuration += dt
-                    if (settlingDuration > 0.40f) {
+                    if (settlingDuration > 0.30f) {
                         state = SimulationState.SETTLING
                         settlingDuration = 0f
                     }
@@ -416,13 +420,13 @@ class FluidSimulationEngine(
                     settlingDuration = 0f
                 }
             } else if (state == SimulationState.SETTLING) {
-                if (maxVelocityObserved > 220f || avgVelocityObserved > 75f) {
+                if (maxVelocityObserved > 180f || avgVelocityObserved > 60f) {
                     state = SimulationState.ACTIVE
                     settlingDuration = 0f
                 } else {
                     settlingDuration += dt
                     // After waves have completely decayed and motion is microscopic, enter SLEEP
-                    if (settlingDuration > 0.65f && maxVelocityObserved < 35f && avgVelocityObserved < 15f) {
+                    if (settlingDuration > 0.45f && maxVelocityObserved < 25f && avgVelocityObserved < 10f) {
                         for (p in particles) {
                             p.vx = 0f
                             p.vy = 0f
