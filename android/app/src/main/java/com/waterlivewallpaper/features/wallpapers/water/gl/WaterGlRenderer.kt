@@ -16,6 +16,15 @@ import java.nio.ByteOrder
 import java.nio.FloatBuffer
 import java.util.concurrent.atomic.AtomicBoolean
 
+/**
+ * Ultra-High-Performance OpenGL ES 2.0 Renderer for Authentic Container Live WaterPaper.
+ *
+ * Renders:
+ * 1. Aspect-ratio preserved background (custom wallpaper or smooth canvas).
+ * 2. Translucent continuous container fluid body (triangle strip mesh with optical wave refraction,
+ *    depth shading, and luminous meniscus glint).
+ * 3. Realistic fine spray droplets (antialiased spherical drops with specular highlights).
+ */
 class WaterGlRenderer(
     private val preferences: WallpaperPreferences,
     private val simulationEngine: FluidSimulationEngine
@@ -44,12 +53,6 @@ class WaterGlRenderer(
     fun notifyInteraction() {
         interactionBoostUntilNs = System.nanoTime() + 1_500_000_000L // 1.5s boost on touch/shake
     }
-
-    // FBO for density splatting
-    private var fboId = 0
-    private var fboTextureId = 0
-    private var fboWidth = 0
-    private var fboHeight = 0
 
     // Custom background texture
     private var bgTextureId = 0
@@ -92,8 +95,6 @@ class WaterGlRenderer(
         this.width = w
         this.height = h
         simulationEngine.setDimensions(w, h)
-        // Rebuild FBO on resize
-        deleteFbo()
     }
 
     @Synchronized
@@ -119,8 +120,6 @@ class WaterGlRenderer(
             releaseEgl()
             return
         }
-
-        initFbo(width, height)
 
         val baseFps = preferences.getEffectiveFps()
         var currentFrameIntervalNs = 1_000_000_000L / baseFps.coerceIn(20, 120)
@@ -170,65 +169,10 @@ class WaterGlRenderer(
             }
         }
 
-        deleteFbo()
         deleteBgTexture()
         currentBgPath = null
         shaderProgram.release()
         releaseEgl()
-    }
-
-    private fun initFbo(w: Int, h: Int) {
-        if (w <= 0 || h <= 0) return
-        deleteFbo()
-
-        // Half-resolution FBO provides natural anti-aliasing and ultra-fast 120 FPS performance
-        fboWidth = (w / 2).coerceAtLeast(1)
-        fboHeight = (h / 2).coerceAtLeast(1)
-
-        val textures = IntArray(1)
-        GLES20.glGenTextures(1, textures, 0)
-        fboTextureId = textures[0]
-
-        GLES20.glBindTexture(GLES20.GL_TEXTURE_2D, fboTextureId)
-        GLES20.glTexImage2D(
-            GLES20.GL_TEXTURE_2D, 0, GLES20.GL_RGBA,
-            fboWidth, fboHeight, 0,
-            GLES20.GL_RGBA, GLES20.GL_UNSIGNED_BYTE, null
-        )
-        GLES20.glTexParameteri(GLES20.GL_TEXTURE_2D, GLES20.GL_TEXTURE_MIN_FILTER, GLES20.GL_LINEAR)
-        GLES20.glTexParameteri(GLES20.GL_TEXTURE_2D, GLES20.GL_TEXTURE_MAG_FILTER, GLES20.GL_LINEAR)
-        GLES20.glTexParameteri(GLES20.GL_TEXTURE_2D, GLES20.GL_TEXTURE_WRAP_S, GLES20.GL_CLAMP_TO_EDGE)
-        GLES20.glTexParameteri(GLES20.GL_TEXTURE_2D, GLES20.GL_TEXTURE_WRAP_T, GLES20.GL_CLAMP_TO_EDGE)
-
-        val framebuffers = IntArray(1)
-        GLES20.glGenFramebuffers(1, framebuffers, 0)
-        fboId = framebuffers[0]
-
-        GLES20.glBindFramebuffer(GLES20.GL_FRAMEBUFFER, fboId)
-        GLES20.glFramebufferTexture2D(
-            GLES20.GL_FRAMEBUFFER, GLES20.GL_COLOR_ATTACHMENT0,
-            GLES20.GL_TEXTURE_2D, fboTextureId, 0
-        )
-
-        val status = GLES20.glCheckFramebufferStatus(GLES20.GL_FRAMEBUFFER)
-        if (status != GLES20.GL_FRAMEBUFFER_COMPLETE) {
-            Log.e(TAG, "Framebuffer incomplete, status: $status")
-        }
-
-        GLES20.glBindFramebuffer(GLES20.GL_FRAMEBUFFER, 0)
-    }
-
-    private fun deleteFbo() {
-        if (fboId != 0) {
-            val fbos = intArrayOf(fboId)
-            GLES20.glDeleteFramebuffers(1, fbos, 0)
-            fboId = 0
-        }
-        if (fboTextureId != 0) {
-            val textures = intArrayOf(fboTextureId)
-            GLES20.glDeleteTextures(1, textures, 0)
-            fboTextureId = 0
-        }
     }
 
     private fun updateBackgroundTexture() {
@@ -293,117 +237,155 @@ class WaterGlRenderer(
     }
 
     private fun renderFrame() {
-        if (fboId == 0) {
-            initFbo(width, height)
-        }
-
-        val count = simulationEngine.populateRenderBuffer()
-        val buffer = simulationEngine.getRenderBuffer()
-
-        // -------------------------------------------------------------
-        // PASS 1: Splat smooth particle densities additively into FBO
-        // -------------------------------------------------------------
-        GLES20.glBindFramebuffer(GLES20.GL_FRAMEBUFFER, fboId)
-        GLES20.glViewport(0, 0, fboWidth, fboHeight)
-        GLES20.glClearColor(0f, 0f, 0f, 0f)
-        GLES20.glClear(GLES20.GL_COLOR_BUFFER_BIT)
-
-        GLES20.glEnable(GLES20.GL_BLEND)
-        GLES20.glBlendFunc(GLES20.GL_ONE, GLES20.GL_ONE)
-
-        GLES20.glUseProgram(shaderProgram.densityProgramId)
-        GLES20.glUniform2f(shaderProgram.uDensityResolutionLoc, width.toFloat(), height.toFloat())
-
-        val stride = 4 * 4 // [x, y, radius, isDroplet]
-
-        buffer.position(0)
-        GLES20.glEnableVertexAttribArray(shaderProgram.aDensityPositionLoc)
-        GLES20.glVertexAttribPointer(shaderProgram.aDensityPositionLoc, 2, GLES20.GL_FLOAT, false, stride, buffer)
-
-        buffer.position(2)
-        GLES20.glEnableVertexAttribArray(shaderProgram.aDensityRadiusLoc)
-        GLES20.glVertexAttribPointer(shaderProgram.aDensityRadiusLoc, 1, GLES20.GL_FLOAT, false, stride, buffer)
-
-        GLES20.glDrawArrays(GLES20.GL_POINTS, 0, count)
-
-        GLES20.glDisableVertexAttribArray(shaderProgram.aDensityPositionLoc)
-        GLES20.glDisableVertexAttribArray(shaderProgram.aDensityRadiusLoc)
-
-        // -------------------------------------------------------------
-        // PASS 2: Fullscreen Isosurface & Luminous Glow reconstruction
-        // -------------------------------------------------------------
-        GLES20.glBindFramebuffer(GLES20.GL_FRAMEBUFFER, 0)
         GLES20.glViewport(0, 0, width, height)
-        GLES20.glDisable(GLES20.GL_BLEND)
 
-        GLES20.glUseProgram(shaderProgram.isoProgramId)
-
-        // Bind density texture
-        GLES20.glActiveTexture(GLES20.GL_TEXTURE0)
-        GLES20.glBindTexture(GLES20.GL_TEXTURE_2D, fboTextureId)
-        GLES20.glUniform1i(shaderProgram.uIsoDensityTextureLoc, 0)
-
-        // Custom Background Image support (uses cached path, zero per-frame file checks)
-        updateBackgroundTexture()
-        if (bgTextureId != 0) {
-            GLES20.glActiveTexture(GLES20.GL_TEXTURE1)
-            GLES20.glBindTexture(GLES20.GL_TEXTURE_2D, bgTextureId)
-            GLES20.glUniform1i(shaderProgram.uIsoBackgroundTextureLoc, 1)
-            GLES20.glUniform1i(shaderProgram.uIsoHasCustomBgLoc, 1)
-            GLES20.glUniform2f(shaderProgram.uIsoScreenResLoc, width.toFloat(), height.toFloat())
-            GLES20.glUniform2f(shaderProgram.uIsoBgResLoc, bgWidth.toFloat(), bgHeight.toFloat())
-        } else {
-            GLES20.glUniform1i(shaderProgram.uIsoHasCustomBgLoc, 0)
-        }
-
-        // Colors (zero SharedPreferences lookups or hex parsing inside render loop)
         val waterColorInt = preferences.getCachedWaterColor()
         val secColorInt = preferences.getCachedWaterSecondaryColor()
         val bgColorInt = preferences.getCachedBackgroundColor()
         val glowIntensity = preferences.getCachedGlowIntensity()
-
         val inv255 = 1f / 255f
+
+        val bgR = Color.red(bgColorInt) * inv255
+        val bgG = Color.green(bgColorInt) * inv255
+        val bgB = Color.blue(bgColorInt) * inv255
+
+        GLES20.glClearColor(bgR, bgG, bgB, 1.0f)
+        GLES20.glClear(GLES20.GL_COLOR_BUFFER_BIT)
+
+        updateBackgroundTexture()
+
+        // -------------------------------------------------------------
+        // STEP 1: Fullscreen Background (Aspect-ratio preserved cover)
+        // -------------------------------------------------------------
+        GLES20.glUseProgram(shaderProgram.bgProgramId)
+
+        if (bgTextureId != 0) {
+            GLES20.glActiveTexture(GLES20.GL_TEXTURE0)
+            GLES20.glBindTexture(GLES20.GL_TEXTURE_2D, bgTextureId)
+            GLES20.glUniform1i(shaderProgram.uBgTextureLoc, 0)
+            GLES20.glUniform1i(shaderProgram.uBgHasCustomBgLoc, 1)
+            GLES20.glUniform2f(shaderProgram.uBgScreenResLoc, width.toFloat(), height.toFloat())
+            GLES20.glUniform2f(shaderProgram.uBgResLoc, bgWidth.toFloat(), bgHeight.toFloat())
+        } else {
+            GLES20.glUniform1i(shaderProgram.uBgHasCustomBgLoc, 0)
+        }
+
+        GLES20.glUniform4f(shaderProgram.uBgColorLoc, bgR, bgG, bgB, 1.0f)
+
+        quadBuffer.position(0)
+        GLES20.glEnableVertexAttribArray(shaderProgram.aBgQuadPositionLoc)
+        GLES20.glVertexAttribPointer(shaderProgram.aBgQuadPositionLoc, 2, GLES20.GL_FLOAT, false, 0, quadBuffer)
+        GLES20.glDrawArrays(GLES20.GL_TRIANGLE_STRIP, 0, 4)
+        GLES20.glDisableVertexAttribArray(shaderProgram.aBgQuadPositionLoc)
+
+        // -------------------------------------------------------------
+        // STEP 2: Translucent Continuous Container Fluid Body Mesh
+        // -------------------------------------------------------------
+        val vertexCount = simulationEngine.populateRenderBuffer()
+        val meshBuffer = simulationEngine.getRenderBuffer()
+
+        GLES20.glEnable(GLES20.GL_BLEND)
+        GLES20.glBlendFunc(GLES20.GL_SRC_ALPHA, GLES20.GL_ONE_MINUS_SRC_ALPHA)
+
+        GLES20.glUseProgram(shaderProgram.fluidProgramId)
+        GLES20.glUniform2f(shaderProgram.uFluidResolutionLoc, width.toFloat(), height.toFloat())
+
+        if (bgTextureId != 0) {
+            GLES20.glActiveTexture(GLES20.GL_TEXTURE0)
+            GLES20.glBindTexture(GLES20.GL_TEXTURE_2D, bgTextureId)
+            GLES20.glUniform1i(shaderProgram.uFluidBackgroundTextureLoc, 0)
+            GLES20.glUniform1i(shaderProgram.uFluidHasCustomBgLoc, 1)
+            GLES20.glUniform2f(shaderProgram.uFluidScreenResLoc, width.toFloat(), height.toFloat())
+            GLES20.glUniform2f(shaderProgram.uFluidBgResLoc, bgWidth.toFloat(), bgHeight.toFloat())
+        } else {
+            GLES20.glUniform1i(shaderProgram.uFluidHasCustomBgLoc, 0)
+        }
+
         GLES20.glUniform4f(
-            shaderProgram.uIsoWaterColorLoc,
+            shaderProgram.uFluidWaterColorLoc,
             Color.red(waterColorInt) * inv255,
             Color.green(waterColorInt) * inv255,
             Color.blue(waterColorInt) * inv255,
             1.0f
         )
         GLES20.glUniform4f(
-            shaderProgram.uIsoSecondaryColorLoc,
+            shaderProgram.uFluidSecondaryColorLoc,
             Color.red(secColorInt) * inv255,
             Color.green(secColorInt) * inv255,
             Color.blue(secColorInt) * inv255,
             1.0f
         )
-        GLES20.glUniform4f(
-            shaderProgram.uIsoBackgroundColorLoc,
-            Color.red(bgColorInt) * inv255,
-            Color.green(bgColorInt) * inv255,
-            Color.blue(bgColorInt) * inv255,
-            1.0f
-        )
-        GLES20.glUniform1f(shaderProgram.uIsoGlowIntensityLoc, glowIntensity)
+        GLES20.glUniform4f(shaderProgram.uFluidBackgroundColorLoc, bgR, bgG, bgB, 1.0f)
+        GLES20.glUniform1f(shaderProgram.uFluidGlowIntensityLoc, glowIntensity)
 
-        // Draw quad
-        quadBuffer.position(0)
-        GLES20.glEnableVertexAttribArray(shaderProgram.aIsoQuadPositionLoc)
-        GLES20.glVertexAttribPointer(shaderProgram.aIsoQuadPositionLoc, 2, GLES20.GL_FLOAT, false, 0, quadBuffer)
+        val stride = 4 * 4 // [x, y, depth, slope]
 
-        GLES20.glDrawArrays(GLES20.GL_TRIANGLE_STRIP, 0, 4)
+        meshBuffer.position(0)
+        GLES20.glEnableVertexAttribArray(shaderProgram.aFluidPositionLoc)
+        GLES20.glVertexAttribPointer(shaderProgram.aFluidPositionLoc, 2, GLES20.GL_FLOAT, false, stride, meshBuffer)
 
-        GLES20.glDisableVertexAttribArray(shaderProgram.aIsoQuadPositionLoc)
+        meshBuffer.position(2)
+        GLES20.glEnableVertexAttribArray(shaderProgram.aFluidDepthLoc)
+        GLES20.glVertexAttribPointer(shaderProgram.aFluidDepthLoc, 1, GLES20.GL_FLOAT, false, stride, meshBuffer)
+
+        meshBuffer.position(3)
+        GLES20.glEnableVertexAttribArray(shaderProgram.aFluidSlopeLoc)
+        GLES20.glVertexAttribPointer(shaderProgram.aFluidSlopeLoc, 1, GLES20.GL_FLOAT, false, stride, meshBuffer)
+
+        GLES20.glDrawArrays(GLES20.GL_TRIANGLE_STRIP, 0, vertexCount)
+
+        GLES20.glDisableVertexAttribArray(shaderProgram.aFluidPositionLoc)
+        GLES20.glDisableVertexAttribArray(shaderProgram.aFluidDepthLoc)
+        GLES20.glDisableVertexAttribArray(shaderProgram.aFluidSlopeLoc)
+
+        // -------------------------------------------------------------
+        // STEP 3: Fine Spray Droplets (Antialiased spherical drops)
+        // -------------------------------------------------------------
+        val dropCount = simulationEngine.populateDropletBuffer()
+        if (dropCount > 0) {
+            val dropBuffer = simulationEngine.getDropletBuffer()
+
+            GLES20.glUseProgram(shaderProgram.dropletProgramId)
+            GLES20.glUniform2f(shaderProgram.uDropResolutionLoc, width.toFloat(), height.toFloat())
+            GLES20.glUniform4f(
+                shaderProgram.uDropWaterColorLoc,
+                Color.red(waterColorInt) * inv255,
+                Color.green(waterColorInt) * inv255,
+                Color.blue(waterColorInt) * inv255,
+                1.0f
+            )
+
+            dropBuffer.position(0)
+            GLES20.glEnableVertexAttribArray(shaderProgram.aDropPositionLoc)
+            GLES20.glVertexAttribPointer(shaderProgram.aDropPositionLoc, 2, GLES20.GL_FLOAT, false, stride, dropBuffer)
+
+            dropBuffer.position(2)
+            GLES20.glEnableVertexAttribArray(shaderProgram.aDropRadiusLoc)
+            GLES20.glVertexAttribPointer(shaderProgram.aDropRadiusLoc, 1, GLES20.GL_FLOAT, false, stride, dropBuffer)
+
+            GLES20.glDrawArrays(GLES20.GL_POINTS, 0, dropCount)
+
+            GLES20.glDisableVertexAttribArray(shaderProgram.aDropPositionLoc)
+            GLES20.glDisableVertexAttribArray(shaderProgram.aDropRadiusLoc)
+        }
+
+        GLES20.glDisable(GLES20.GL_BLEND)
     }
 
     private fun initEgl(surface: Surface): Boolean {
         eglDisplay = EGL14.eglGetDisplay(EGL14.EGL_DEFAULT_DISPLAY)
-        if (eglDisplay == EGL14.EGL_NO_DISPLAY) return false
+        if (eglDisplay == EGL14.EGL_NO_DISPLAY) {
+            Log.e(TAG, "eglGetDisplay failed")
+            return false
+        }
 
         val version = IntArray(2)
-        if (!EGL14.eglInitialize(eglDisplay, version, 0, version, 1)) return false
+        if (!EGL14.eglInitialize(eglDisplay, version, 0, version, 1)) {
+            Log.e(TAG, "eglInitialize failed")
+            return false
+        }
 
-        val configAttribs = intArrayOf(
+        val attribList = intArrayOf(
             EGL14.EGL_RENDERABLE_TYPE, EGL_OPENGL_ES2_BIT,
             EGL14.EGL_RED_SIZE, 8,
             EGL14.EGL_GREEN_SIZE, 8,
@@ -414,7 +396,8 @@ class WaterGlRenderer(
 
         val configs = arrayOfNulls<EGLConfig>(1)
         val numConfigs = IntArray(1)
-        if (!EGL14.eglChooseConfig(eglDisplay, configAttribs, 0, configs, 0, configs.size, numConfigs, 0) || numConfigs[0] == 0) {
+        if (!EGL14.eglChooseConfig(eglDisplay, attribList, 0, configs, 0, 1, numConfigs, 0) || numConfigs[0] == 0) {
+            Log.e(TAG, "eglChooseConfig failed")
             return false
         }
         val config = configs[0]
@@ -424,13 +407,24 @@ class WaterGlRenderer(
             EGL14.EGL_NONE
         )
         eglContext = EGL14.eglCreateContext(eglDisplay, config, EGL14.EGL_NO_CONTEXT, contextAttribs, 0)
-        if (eglContext == EGL14.EGL_NO_CONTEXT) return false
+        if (eglContext == EGL14.EGL_NO_CONTEXT) {
+            Log.e(TAG, "eglCreateContext failed")
+            return false
+        }
 
         val surfaceAttribs = intArrayOf(EGL14.EGL_NONE)
         eglSurface = EGL14.eglCreateWindowSurface(eglDisplay, config, surface, surfaceAttribs, 0)
-        if (eglSurface == EGL14.EGL_NO_SURFACE) return false
+        if (eglSurface == EGL14.EGL_NO_SURFACE) {
+            Log.e(TAG, "eglCreateWindowSurface failed")
+            return false
+        }
 
-        return EGL14.eglMakeCurrent(eglDisplay, eglSurface, eglSurface, eglContext)
+        if (!EGL14.eglMakeCurrent(eglDisplay, eglSurface, eglSurface, eglContext)) {
+            Log.e(TAG, "eglMakeCurrent failed")
+            return false
+        }
+
+        return true
     }
 
     private fun releaseEgl() {
