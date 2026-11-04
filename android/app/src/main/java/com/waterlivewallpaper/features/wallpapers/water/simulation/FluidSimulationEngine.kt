@@ -58,7 +58,7 @@ class FluidSimulationEngine(
     // Calibrated SPH physical parameters
     private val particleRadius = 32.0f
     private val dropletRadius = 14.0f
-    private val restDensity = 1.8f
+    private val restDensity = 2.4f
     private val stiffness = 3600f
     private val viscosity = 24f
     private val surfaceTensionCoeff = 1.4f
@@ -163,23 +163,21 @@ class FluidSimulationEngine(
             val w = if (screenWidth > 0) screenWidth.toFloat() else 1080f
             val h = if (screenHeight > 0) screenHeight.toFloat() else 2400f
 
-            // Budget: 180 to 280 particles for balanced performance and rich continuous fluid volume
-            val baseMin = if (batterySaver) 160 else 220
-            val baseScale = if (batterySaver) 120 else 160
+            // Budget: 200 to 300 particles for rich, dense, continuous liquid body
+            val baseMin = if (batterySaver) 180 else 240
+            val baseScale = if (batterySaver) 100 else 140
             val maxCap = if (batterySaver) 260 else 360
-            val count = (baseMin + volume * baseScale).toInt().coerceIn(baseMin, maxCap)
+            val targetCount = (baseMin + volume * baseScale).toInt().coerceIn(baseMin, maxCap)
 
-            val poolHeight = h * volume.coerceIn(0.18f, 0.70f)
-            val totalArea = w * poolHeight
-            val areaPerParticle = totalArea / count
-            val spacing = sqrt(areaPerParticle / 0.866f).coerceIn(particleRadius * 1.30f, particleRadius * 2.20f)
-
-            val rawCols = max(10, (w / spacing).toInt())
+            // Optimal resting fluid spacing (1.25x - 1.40x particle radius)
+            val spacing = (particleRadius * 1.30f).coerceIn(38f, 46f)
+            val rawCols = max(12, (w / spacing).toInt())
             val cols = if (rawCols % 2 == 1) rawCols + 1 else rawCols
-            val rows = max(4, (count + cols - 1) / cols)
+            val rows = max(6, (targetCount + cols - 1) / cols)
             val totalParticles = rows * cols
             val actualSpacingX = w / cols.toFloat()
-            val actualSpacingY = poolHeight / rows.toFloat()
+            val actualSpacingY = actualSpacingX * 0.95f
+            val poolHeight = rows * actualSpacingY
 
             val startX = actualSpacingX * 0.5f
             val startY = h - poolHeight + actualSpacingY * 0.5f

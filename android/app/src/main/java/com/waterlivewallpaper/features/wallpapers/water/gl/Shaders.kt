@@ -15,9 +15,8 @@ object Shaders {
             vec2 clipSpace = zeroToOne * 2.0 - 1.0;
             // Invert Y so (0,0) in screen coordinates is at the top of the viewport
             gl_Position = vec4(clipSpace.x, -clipSpace.y, 0.0, 1.0);
-            // Splat size in FBO pixel units: FBO is half-resolution (w/2, h/2)
-            // Splat diameter covers adjacent particles in hexagonal lattice smoothly
-            gl_PointSize = a_Radius * 1.55;
+            // Splat size in FBO pixel units: covers adjacent particles smoothly to form continuous fluid
+            gl_PointSize = a_Radius * 3.2;
         }
     """.trimIndent()
 
@@ -31,9 +30,9 @@ object Shaders {
             if (r2 >= 1.0) {
                 discard;
             }
-            // High-order smooth polynomial kernel with zero slope at boundary: (1 - r^2)^3
+            // Smooth Gaussian-like quadratic kernel (1 - r^2)^2 ensures seamless overlap between particles
             float falloff = 1.0 - r2;
-            float density = falloff * falloff * falloff;
+            float density = falloff * falloff;
             gl_FragColor = vec4(density, density, density, 1.0);
         }
     """.trimIndent()
@@ -70,9 +69,9 @@ object Shaders {
             vec2 uv = v_TexCoord;
             float density = texture2D(u_DensityTexture, uv).r;
 
-            // Calibrated thresholds for smooth water isosurface
-            float liquidThreshold = 0.22;
-            float glowThreshold = 0.05;
+            // Calibrated thresholds for smooth continuous water isosurface
+            float liquidThreshold = 0.16;
+            float glowThreshold = 0.03;
 
             // Direct background coordinate (aspect-ratio preserved cover image or solid color)
             vec2 rawUv = vec2(uv.x, 1.0 - uv.y);

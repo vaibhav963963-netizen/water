@@ -8,8 +8,7 @@ on:
       - 'android/**'
       - '.github/workflows/android-release.yml'
       - 'scripts/**'
-      - 'src/**'
-      - 'app/**'
+      - 'tests/**'
       - 'package.json'
   workflow_dispatch:
     inputs:
