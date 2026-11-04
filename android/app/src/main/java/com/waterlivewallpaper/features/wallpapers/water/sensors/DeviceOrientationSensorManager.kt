@@ -135,6 +135,8 @@ class DeviceOrientationSensorManager(
                         // Snap near-zero upright deadzones
                         if (abs(smoothGx) < 0.35f) smoothGx = 0f
                         if (abs(smoothGy - 9.8f) < 0.35f && smoothGx == 0f) smoothGy = 9.8f
+                            if (abs(smoothGy - (-9.8f)) < 0.35f && smoothGx == 0f) smoothGy = -9.8f
+                        if (abs(smoothGy - (-9.8f)) < 0.35f && smoothGx == 0f) smoothGy = -9.8f
 
                         latchedGx = smoothGx
                         latchedGy = smoothGy
